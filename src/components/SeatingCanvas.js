@@ -110,6 +110,11 @@ function SeatingCanvas({ guests }) {
             updatedTables[tableIndex] = [...updatedTables[tableIndex], guest];
             return updatedTables;
         });
+
+        // Remove guest from guestList
+        setGuestList(prevGuestList =>
+            prevGuestList.filter(unassigned => unassigned.id !== guest.id)
+        );
     };
 
     const handleRemove = (guest, tableIndex) => {
@@ -119,7 +124,10 @@ function SeatingCanvas({ guests }) {
             return updatedTables;
         });
 
-        setGuestList(prevGuestList => [...prevGuestList, guest]);
+        // Add guest back to guestList if it's a "+1"
+        if (guest.firstName.includes('+1')) {
+            setGuestList(prevGuestList => [...prevGuestList, guest]);
+        }
     };
 
     const handleReassign = (guest, fromTableIndex, toTableIndex) => {
@@ -529,4 +537,5 @@ function SeatingCanvas({ guests }) {
 }
 
 export default SeatingCanvas;
+
 
