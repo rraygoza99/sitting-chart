@@ -1,25 +1,31 @@
+import React, { useState } from 'react';
 import logo from './logo.svg';
 import './App.css';
+import CSVImporter from './components/CSVImporter';
+import SeatingCanvas from './components/SeatingCanvas';
 
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+    const [guests, setGuests] = useState([]);
+
+    const handleImport = (importedGuests) => {
+        setGuests((prevGuests) => {
+            const existingGuestIDs = new Set(prevGuests.map(guest => guest.id));
+            const filteredGuests = importedGuests.filter(
+                guest => !existingGuestIDs.has(guest.id) // Avoid duplicates based on ID
+            );
+            return [...prevGuests, ...filteredGuests];
+        });
+    };
+
+    return (
+        <div className="App">
+            <header className="App-header">
+                <h1>Wedding Seating Arrangement</h1>
+                <CSVImporter onImport={handleImport} />
+                <SeatingCanvas guests={guests} />
+            </header>
+        </div>
+    );
 }
 
 export default App;

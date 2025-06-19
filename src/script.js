@@ -1,0 +1,9 @@
+const guestList = document.getElementById('guestList');
+guestList.style.position = 'fixed';
+guestList.style.left = '0';
+guestList.style.width = '400px';
+guestList.style.height = '100px';
+guestList.style.overflowY = 'auto';
+guestList.style.overflowX = 'hidden';
+guestList.style.borderRight = '1px solid #ccc';
+guestList.style.padding = '10px';
