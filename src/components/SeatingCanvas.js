@@ -173,7 +173,7 @@ function SeatingCanvas({ guests }) {
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
                 guest.id === guestId && guest.firstName.includes('+1')
-                    ? { ...guest, firstName: newName } // Rename "+1" guest while preserving other properties
+                    ? { ...guest, firstName: newName, lastName: '' } // Rename "+1" guest and clear last name
                     : guest
             )
         );
