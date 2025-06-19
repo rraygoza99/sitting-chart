@@ -347,54 +347,134 @@ function SeatingCanvas({ guests }) {
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3>{groupName}</h3>
                     {groupedGuests[groupName].map((guest) => (
-                        <div
-                            key={guest.id}
-                            draggable
-                            onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
-                            style={{ border: '1px solid #ccc', padding: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={selectedGuests.has(guest.id)}
-                                onChange={() => handleSelectGuest(guest.id)}
-                                style={{ marginRight: '10px' }}
-                            />
-                            <span>
-                                {guest.firstName} {guest.lastName}
-                            </span>
-                            <button
-                                onClick={() => handleAddPlusOne(guest)}
-                                style={{ marginLeft: '10px', cursor: 'pointer' }}
+                        <div key={guest.id}>
+                            {/* Original guest */}
+                            <div
+                                draggable
+                                onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
+                                style={{
+                                    border: '1px solid #ccc',
+                                    padding: '5px',
+                                    marginBottom: '5px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                }}
                             >
-                                +1
-                            </button>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedGuests.has(guest.id)}
+                                    onChange={() => handleSelectGuest(guest.id)}
+                                    style={{ marginRight: '10px' }}
+                                />
+                                <span>
+                                    {guest.firstName} {guest.lastName}
+                                </span>
+                                <button
+                                    onClick={() => handleAddPlusOne(guest)}
+                                    style={{ marginLeft: '10px', cursor: 'pointer' }}
+                                >
+                                    +1
+                                </button>
+                            </div>
+                            {/* "+1" guests */}
+                            {guestList
+                                .filter(
+                                    plusOne =>
+                                        plusOne.firstName.startsWith(`${guest.firstName} +1`) &&
+                                        plusOne.lastName === guest.lastName
+                                )
+                                .map((plusOne) => (
+                                    <div
+                                        key={plusOne.id}
+                                        draggable
+                                        onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
+                                        style={{
+                                            border: '1px solid #ccc',
+                                            padding: '5px',
+                                            marginLeft: '20px',
+                                            marginBottom: '5px',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                        }}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedGuests.has(plusOne.id)}
+                                            onChange={() => handleSelectGuest(plusOne.id)}
+                                            style={{ marginRight: '10px' }}
+                                        />
+                                        <span>
+                                            {plusOne.firstName} {plusOne.lastName}
+                                        </span>
+                                    </div>
+                                ))}
                         </div>
                     ))}
                 </div>
             ));
         } else {
             return guestList.map((guest) => (
-                <div
-                    key={guest.id}
-                    draggable
-                    onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
-                    style={{ border: '1px solid #ccc', padding: '5px', marginBottom: '5px', display: 'flex', justifyContent: 'space-between' }}
-                >
-                    <input
-                        type="checkbox"
-                        checked={selectedGuests.has(guest.id)}
-                        onChange={() => handleSelectGuest(guest.id)}
-                        style={{ marginRight: '10px' }}
-                    />
-                    <span>
-                        {guest.firstName} {guest.lastName}
-                    </span>
-                    <button
-                        onClick={() => handleAddPlusOne(guest)}
-                        style={{ marginLeft: '10px', cursor: 'pointer' }}
+                <div key={guest.id}>
+                    {/* Original guest */}
+                    <div
+                        draggable
+                        onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
+                        style={{
+                            border: '1px solid #ccc',
+                            padding: '5px',
+                            marginBottom: '5px',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                        }}
                     >
-                        +1
-                    </button>
+                        <input
+                            type="checkbox"
+                            checked={selectedGuests.has(guest.id)}
+                            onChange={() => handleSelectGuest(guest.id)}
+                            style={{ marginRight: '10px' }}
+                        />
+                        <span>
+                            {guest.firstName} {guest.lastName}
+                        </span>
+                        <button
+                            onClick={() => handleAddPlusOne(guest)}
+                            style={{ marginLeft: '10px', cursor: 'pointer' }}
+                        >
+                            +1
+                        </button>
+                    </div>
+                    {/* "+1" guests */}
+                    {guestList
+                        .filter(
+                            plusOne =>
+                                plusOne.firstName.startsWith(`${guest.firstName} +1`) &&
+                                plusOne.lastName === guest.lastName
+                        )
+                        .map((plusOne) => (
+                            <div
+                                key={plusOne.id}
+                                draggable
+                                onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
+                                style={{
+                                    border: '1px solid #ccc',
+                                    padding: '5px',
+                                    marginLeft: '20px',
+                                    marginBottom: '5px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={selectedGuests.has(plusOne.id)}
+                                    onChange={() => handleSelectGuest(plusOne.id)}
+                                    style={{ marginRight: '10px' }}
+                                />
+                                <span>
+                                    {plusOne.firstName} {plusOne.lastName}
+                                </span>
+                            </div>
+                        ))}
                 </div>
             ));
         }
