@@ -97,15 +97,19 @@ function SeatingCanvas({ guests }) {
     };
 
     const handleDrop = (guest, tableIndex) => {
+        const fromTableIndex = parseInt(guest.fromTableIndex, 10); // Extract the original table index
         setTables(prevTables => {
             const updatedTables = [...prevTables];
+            if (!isNaN(fromTableIndex) && fromTableIndex !== tableIndex) {
+                // Remove guest from the original table
+                updatedTables[fromTableIndex] = updatedTables[fromTableIndex].filter(
+                    assigned => assigned.id !== guest.id
+                );
+            }
+            // Add guest to the new table
             updatedTables[tableIndex] = [...updatedTables[tableIndex], guest];
             return updatedTables;
         });
-
-        setGuestList(prevGuestList =>
-            prevGuestList.filter(unassigned => unassigned.id !== guest.id)
-        );
     };
 
     const handleRemove = (guest, tableIndex) => {
@@ -194,8 +198,10 @@ function SeatingCanvas({ guests }) {
                             key={guest.id}
                             draggable
                             onDragStart={(e) => {
-                                e.dataTransfer.setData('guest', JSON.stringify(guest));
-                                e.dataTransfer.setData('fromTableIndex', tableIndex);
+                                e.dataTransfer.setData(
+                                    'guest',
+                                    JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
+                                );
                             }}
                             style={{
                                 border: '1px solid #ccc',
@@ -292,8 +298,10 @@ function SeatingCanvas({ guests }) {
                                 key={guest.id}
                                 draggable
                                 onDragStart={(e) => {
-                                    e.dataTransfer.setData('guest', JSON.stringify(guest));
-                                    e.dataTransfer.setData('fromTableIndex', tableIndex);
+                                    e.dataTransfer.setData(
+                                        'guest',
+                                        JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
+                                    );
                                 }}
                                 onDoubleClick={() => {
                                     setTables(prevTables => {
