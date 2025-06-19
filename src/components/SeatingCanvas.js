@@ -124,10 +124,8 @@ function SeatingCanvas({ guests }) {
             return updatedTables;
         });
 
-        // Add guest back to guestList if it's a "+1"
-        if (guest.firstName.includes('+1')) {
-            setGuestList(prevGuestList => [...prevGuestList, guest]);
-        }
+        // Add guest back to guestList
+        setGuestList(prevGuestList => [...prevGuestList, guest]);
     };
 
     const handleReassign = (guest, fromTableIndex, toTableIndex) => {
@@ -146,6 +144,7 @@ function SeatingCanvas({ guests }) {
                 firstName: `${guest.firstName} +1`,
                 lastName: guest.lastName,
                 group: guest.group,
+                originalGuestId: guest.id, // Reference to the original guest
                 id: `guest-${Date.now()}-${Math.random()}`, // Generate unique ID for each "+1"
             },
         ]);
@@ -168,6 +167,16 @@ function SeatingCanvas({ guests }) {
             prevGuestList.filter(guest => !selectedGuests.has(guest.id))
         );
         setSelectedGuests(new Set()); // Clear selected guests
+    };
+
+    const renamePlusOne = (guestId, newName) => {
+        setGuestList(prevGuestList =>
+            prevGuestList.map(guest =>
+                guest.id === guestId && guest.firstName.includes('+1')
+                    ? { ...guest, firstName: newName } // Rename "+1" guest while preserving other properties
+                    : guest
+            )
+        );
     };
 
     const renderListView = () => (
@@ -363,7 +372,7 @@ function SeatingCanvas({ guests }) {
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3>{groupName}</h3>
                     {groupedGuests[groupName]
-                        .filter(guest => !guest.firstName.includes('+1')) // Exclude "+1" guests from main list
+                        .filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
                         .map((guest) => (
                             <div key={guest.id}>
                                 {/* Original guest */}
@@ -398,14 +407,17 @@ function SeatingCanvas({ guests }) {
                                 {guestList
                                     .filter(
                                         plusOne =>
-                                            plusOne.firstName.startsWith(`${guest.firstName} +1`) &&
-                                            plusOne.lastName === guest.lastName
+                                            plusOne.originalGuestId === guest.id // Ensure "+1" guests are tied to their original guest
                                     )
                                     .map((plusOne) => (
                                         <div
                                             key={plusOne.id}
                                             draggable
                                             onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
+                                            onDoubleClick={() => {
+                                                const newName = prompt('Enter new name for this guest:', plusOne.firstName);
+                                                if (newName) renamePlusOne(plusOne.id, newName);
+                                            }}
                                             style={{
                                                 border: '1px solid #ccc',
                                                 padding: '5px',
@@ -432,7 +444,7 @@ function SeatingCanvas({ guests }) {
             ));
         } else {
             return guestList
-                .filter(guest => !guest.firstName.includes('+1')) // Exclude "+1" guests from main list
+                .filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
                 .map((guest) => (
                     <div key={guest.id}>
                         {/* Original guest */}
@@ -467,14 +479,17 @@ function SeatingCanvas({ guests }) {
                         {guestList
                             .filter(
                                 plusOne =>
-                                    plusOne.firstName.startsWith(`${guest.firstName} +1`) &&
-                                    plusOne.lastName === guest.lastName
+                                    plusOne.originalGuestId === guest.id // Ensure "+1" guests are tied to their original guest
                             )
                             .map((plusOne) => (
                                 <div
                                     key={plusOne.id}
                                     draggable
                                     onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
+                                    onDoubleClick={() => {
+                                        const newName = prompt('Enter new name for this guest:', plusOne.firstName);
+                                        if (newName) renamePlusOne(plusOne.id, newName);
+                                    }}
                                     style={{
                                         border: '1px solid #ccc',
                                         padding: '5px',
