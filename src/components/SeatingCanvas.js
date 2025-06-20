@@ -142,12 +142,13 @@ function SeatingCanvas({ guests }) {
             ...prevGuestList,
             {
                 firstName: `${guest.firstName} +1`,
-                lastName: guest.lastName,
+                lastName: '', // Clear last name for "+1" guests
                 group: guest.group,
                 originalGuestId: guest.id, // Reference to the original guest
                 id: `guest-${Date.now()}-${Math.random()}`, // Generate unique ID for each "+1"
             },
         ]);
+        updateTables(guestList.length + 1); // Update tables to account for the new "+1" guest
     };
 
     const handleSelectGuest = (guestId) => {
