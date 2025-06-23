@@ -1,4 +1,5 @@
 import React from 'react';
+import Button from '@mui/material/Button'; // Import Material-UI Button
 
 function CSVImporter({ onImport }) {
     const handleFileUpload = (event) => {
@@ -23,8 +24,21 @@ function CSVImporter({ onImport }) {
     };
 
     return (
-        <div>
-            <input type="file" accept=".csv" onChange={handleFileUpload} />
+        <div style={{ marginBottom: '10px' }}>
+            <input
+                type="file"
+                accept=".csv"
+                id="fileInput"
+                style={{ display: 'none' }}
+                onChange={handleFileUpload}
+            />
+            <Button
+                variant="contained"
+                color="primary"
+                onClick={() => document.getElementById('fileInput').click()}
+            >
+                Import CSV
+            </Button>
         </div>
     );
 }

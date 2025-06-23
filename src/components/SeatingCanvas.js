@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
+import Button from '@mui/material/Button'; // Import Material-UI Button
+import Alert from '@mui/material/Alert'; // Import Material-UI Alert
+import Snackbar from '@mui/material/Snackbar'; // Import Material-UI Snackbar
+import ExposurePlus1Icon from '@mui/icons-material/Exposure'; // Import Material-UI ExposurePlus1 icon
+import Icon from '@mui/material/Icon'; // Import Material-UI Icon
+import IconButton from '@mui/material/IconButton'; // Import Material-UI IconButton
+import CloseIcon from '@mui/icons-material/Close'; // Import Material-UI Close icon
 
 function SeatingCanvas({ guests }) {
     const [tables, setTables] = useState([]);
@@ -7,6 +14,11 @@ function SeatingCanvas({ guests }) {
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'visual'
     const [isGrouped, setIsGrouped] = useState(true); // Toggle for grouping
     const [selectedGuests, setSelectedGuests] = useState(new Set()); // Track selected guests
+    const [alertMessage, setAlertMessage] = useState(''); // Alert message
+    const [alertOpen, setAlertOpen] = useState(false); // Alert visibility
+    const [alertSeverity, setAlertSeverity] = useState('success'); // Severity of the alert
+
+    const handleCloseAlert = () => setAlertOpen(false); // Close alert handler
 
     useEffect(() => {
         const savedData = localStorage.getItem('weddingArrangement');
@@ -40,7 +52,9 @@ function SeatingCanvas({ guests }) {
             savedTables: tables,
         };
         localStorage.setItem('weddingArrangement', JSON.stringify(dataToSave));
-        alert('Arrangement saved successfully!');
+        setAlertMessage('Arrangement saved successfully!');
+        setAlertSeverity('success');
+        setAlertOpen(true);
     };
 
     const deleteArrangement = () => {
@@ -49,8 +63,10 @@ function SeatingCanvas({ guests }) {
         setGuestList(initialGuestList.sort((a, b) => a.firstName.localeCompare(b.firstName)));
         const totalGuests = guests.length;
         const requiredTables = Math.ceil(totalGuests / 10);
-        setTables(Array(requiredTables).fill([]));
-        alert('Arrangement deleted successfully!');
+        setTables(Array(requiredTables).fill([])); // Reset tables state
+        setAlertMessage('Arrangement deleted successfully!');
+        setAlertSeverity('warning');
+        setAlertOpen(true);
     };
 
     const exportToPDF = () => {
@@ -128,14 +144,14 @@ function SeatingCanvas({ guests }) {
         setGuestList(prevGuestList => [...prevGuestList, guest]);
     };
 
-    const handleReassign = (guest, fromTableIndex, toTableIndex) => {
+    /*const handleReassign = (guest, fromTableIndex, toTableIndex) => {
         setTables(prevTables => {
             const updatedTables = [...prevTables];
             updatedTables[fromTableIndex] = updatedTables[fromTableIndex].filter(assigned => assigned.id !== guest.id);
             updatedTables[toTableIndex] = [...updatedTables[toTableIndex], guest];
             return updatedTables;
         });
-    };
+    };*/
 
     const handleAddPlusOne = (guest) => {
         setGuestList(prevGuestList => [
@@ -201,7 +217,8 @@ function SeatingCanvas({ guests }) {
                         handleDrop(guest, tableIndex);
                     }}
                     style={{
-                        border: '1px solid #000',
+                        border: '3px solid #fff',
+                        borderRadius: '10px', // Add rounded corners
                         padding: '10px',
                         width: '300px',
                         height: '300px',
@@ -232,12 +249,14 @@ function SeatingCanvas({ guests }) {
                             <span>
                                 {guest.firstName} {guest.lastName}
                             </span>
-                            <button
+                            <IconButton
                                 onClick={() => handleRemove(guest, tableIndex)}
-                                style={{ marginLeft: '10px', cursor: 'pointer' }}
+                                style={{ marginLeft: '10px' }}
+                                color="error"
+                                size="small"
                             >
-                                X
-                            </button>
+                                <CloseIcon />
+                            </IconButton>
                         </div>
                     ))}
                 </div>
@@ -381,7 +400,7 @@ function SeatingCanvas({ guests }) {
                                     draggable
                                     onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
                                     style={{
-                                        border: '1px solid #ccc',
+                                        border: '1px solid #000',
                                         padding: '5px',
                                         marginBottom: '5px',
                                         display: 'flex',
@@ -397,12 +416,14 @@ function SeatingCanvas({ guests }) {
                                     <span>
                                         {guest.firstName} {guest.lastName}
                                     </span>
-                                    <button
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
                                         onClick={() => handleAddPlusOne(guest)}
-                                        style={{ marginLeft: '10px', cursor: 'pointer' }}
+                                        style={{ marginLeft: '10px' }}
                                     >
-                                        +1
-                                    </button>
+                                        <Icon>exposure_plus_1</Icon>
+                                    </Button>
                                 </div>
                                 {/* "+1" guests */}
                                 {guestList
@@ -469,12 +490,14 @@ function SeatingCanvas({ guests }) {
                             <span>
                                 {guest.firstName} {guest.lastName}
                             </span>
-                            <button
+                            <Button
+                                variant="contained"
+                                color="primary"
                                 onClick={() => handleAddPlusOne(guest)}
-                                style={{ marginLeft: '10px', cursor: 'pointer' }}
+                                style={{ marginLeft: '10px' }}
                             >
-                                +1
-                            </button>
+                                <ExposurePlus1Icon />
+                            </Button>
                         </div>
                         {/* "+1" guests */}
                         {guestList
@@ -518,19 +541,48 @@ function SeatingCanvas({ guests }) {
 
     return (
         <div style={{ display: 'flex' }}>
+            <Snackbar open={alertOpen} autoHideDuration={3000} onClose={handleCloseAlert}>
+                <Alert onClose={handleCloseAlert} severity={alertSeverity}>
+                    {alertMessage}
+                </Alert>
+            </Snackbar>
             <div className="guestList">
-                <button onClick={saveArrangement} style={{ marginBottom: '10px', cursor: 'pointer' }}>
-                    Save Arrangement
-                </button>
-                <button onClick={deleteArrangement} style={{ marginBottom: '10px', cursor: 'pointer' }}>
-                    Delete Arrangement
-                </button>
-                <button onClick={exportToPDF} style={{ marginBottom: '10px', cursor: 'pointer' }}>
-                    Export to PDF
-                </button>
-                <button onClick={toggleViewMode} style={{ marginBottom: '10px', cursor: 'pointer' }}>
-                    Switch to {viewMode === 'list' ? 'Visual View' : 'List View'}
-                </button>
+                <div>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={saveArrangement}
+                        style={{ marginBottom: '10px', marginRight: '10px' }}
+                    >
+                        Save Arrangement
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        onClick={deleteArrangement}
+                        style={{ marginBottom: '10px' }}
+                    >
+                        Delete Arrangement
+                    </Button>
+                </div>
+                <div>
+                    <Button
+                        variant="contained"
+                        color="success"
+                        onClick={exportToPDF}
+                        style={{ marginBottom: '10px', marginRight: '10px' }}
+                    >
+                        Export to PDF
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="info"
+                        onClick={toggleViewMode}
+                        style={{ marginBottom: '10px' }}
+                    >
+                        Switch to {viewMode === 'list' ? 'Visual View' : 'List View'}
+                    </Button>
+                </div>
                 <label style={{ display: 'block', marginBottom: '10px' }}>
                     <input
                         type="checkbox"
@@ -540,9 +592,14 @@ function SeatingCanvas({ guests }) {
                     />
                     Group Guests
                 </label>
-                <button onClick={removeSelectedGuests} style={{ marginBottom: '10px', cursor: 'pointer' }}>
+                <Button
+                    variant="contained"
+                    color="error"
+                    onClick={removeSelectedGuests}
+                    style={{ marginBottom: '10px' }}
+                >
                     Remove Selected Guests
-                </button>
+                </Button>
                 <h2>Guest List</h2>
                 <p>Total Guests: {guestList.length}</p>
                 {renderGuestList()}

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import logo from './logo.svg';
 import './App.css';
 import CSVImporter from './components/CSVImporter';
 import SeatingCanvas from './components/SeatingCanvas';
