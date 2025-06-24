@@ -7,6 +7,7 @@ import ExposurePlus1Icon from '@mui/icons-material/Exposure'; // Import Material
 import Icon from '@mui/material/Icon'; // Import Material-UI Icon
 import IconButton from '@mui/material/IconButton'; // Import Material-UI IconButton
 import CloseIcon from '@mui/icons-material/Close'; // Import Material-UI Close icon
+import './SeatingCanvas.css'; // Import the CSS file
 
 function SeatingCanvas({ guests }) {
     const [tables, setTables] = useState([]);
@@ -198,15 +199,8 @@ function SeatingCanvas({ guests }) {
 
     const renderListView = () => (
         <div
-            style={{
-                marginLeft: '20px',
-                flex: 1,
-                display: 'flex',
-                gap: '20px',
-                flexWrap: 'wrap',
-                overflowY: 'auto',
-                height: '100vh',
-            }}
+
+            className='tables-container'
         >
             {tables.map((table, tableIndex) => (
                 <div
@@ -216,14 +210,7 @@ function SeatingCanvas({ guests }) {
                         const guest = JSON.parse(e.dataTransfer.getData('guest'));
                         handleDrop(guest, tableIndex);
                     }}
-                    style={{
-                        border: '3px solid #fff',
-                        borderRadius: '10px', // Add rounded corners
-                        padding: '10px',
-                        width: '300px',
-                        height: '300px',
-                        overflowY: 'auto',
-                    }}
+                    className='single-table'
                 >
                     <h3 style={{ marginBottom: '10px' }}>
                         Table {tableIndex + 1} ({table.length}/10) {/* Counter for assigned seats */}
@@ -238,13 +225,7 @@ function SeatingCanvas({ guests }) {
                                     JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
                                 );
                             }}
-                            style={{
-                                border: '1px solid #ccc',
-                                padding: '5px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                marginBottom: '5px',
-                            }}
+                            className='table-guest-item'
                         >
                             <span>
                                 {guest.firstName} {guest.lastName}
@@ -266,15 +247,7 @@ function SeatingCanvas({ guests }) {
 
     const renderVisualView = () => (
         <div
-            style={{
-                marginLeft: '20px',
-                flex: 1,
-                display: 'flex',
-                gap: '20px',
-                flexWrap: 'wrap',
-                overflowY: 'auto',
-                height: '100vh',
-            }}
+            className='visual-tables-container'
         >
             {tables.map((table, tableIndex) => (
                 <div
@@ -282,46 +255,27 @@ function SeatingCanvas({ guests }) {
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => {
                         const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                        const fromTableIndex = e.dataTransfer.getData('fromTableIndex');
-                        if (fromTableIndex) {
-                            setTables(prevTables => {
-                                const updatedTables = [...prevTables];
-                                updatedTables[parseInt(fromTableIndex, 10)] = updatedTables[parseInt(fromTableIndex, 10)].filter(
+                        const fromTableIndex = parseInt(guest.fromTableIndex, 10); // Extract the original table index
+                        setTables(prevTables => {
+                            const updatedTables = [...prevTables];
+                            if (!isNaN(fromTableIndex) && fromTableIndex !== tableIndex) {
+                                // Remove guest from the original table
+                                updatedTables[fromTableIndex] = updatedTables[fromTableIndex].filter(
                                     assigned => assigned.id !== guest.id
                                 );
-                                updatedTables[tableIndex] = [...updatedTables[tableIndex], guest];
-                                return updatedTables;
-                            });
-                        } else {
-                            setTables(prevTables => {
-                                const updatedTables = [...prevTables];
-                                updatedTables[tableIndex] = [...updatedTables[tableIndex], guest];
-                                return updatedTables;
-                            });
-                            setGuestList(prevGuestList =>
-                                prevGuestList.filter(unassigned => unassigned.id !== guest.id)
-                            );
-                        }
+                            }
+                            // Add guest to the new table
+                            updatedTables[tableIndex] = [...updatedTables[tableIndex], guest];
+                            return updatedTables;
+                        });
+                        setGuestList(prevGuestList =>
+                            prevGuestList.filter(unassigned => unassigned.id !== guest.id)
+                        );
                     }}
-                    style={{
-                        position: 'relative',
-                        width: '300px',
-                        height: '300px',
-                        border: '1px solid #000',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                    }}
+                    className='visual-table-border'
                 >
                     <span
-                        style={{
-                            position: 'absolute',
-                            top: '50%',
-                            left: '50%',
-                            transform: 'translate(-50%, -50%)',
-                            fontWeight: 'bold',
-                        }}
+                        className='visual-table-title'
                     >
                         Table {tableIndex + 1} ({table.length}/10)
                     </span>
@@ -350,22 +304,12 @@ function SeatingCanvas({ guests }) {
                                     });
                                     setGuestList(prevGuestList => [...prevGuestList, guest]);
                                 }}
+                                className='visual-table-guest-item'
                                 style={{
                                     position: 'absolute',
                                     top: `${y}px`,
                                     left: `${x}px`,
-                                    width: '60px',
-                                    height: '60px',
-                                    borderRadius: '50%',
-                                    border: '1px solid #ccc',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    backgroundColor: '#fff',
-                                    fontSize: '12px',
-                                    textAlign: 'center',
-                                    color: '#000',
-                                    cursor: 'pointer',
+                                    
                                 }}
                             >
                                 {guest.firstName} {guest.lastName}
@@ -399,13 +343,7 @@ function SeatingCanvas({ guests }) {
                                 <div
                                     draggable
                                     onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
-                                    style={{
-                                        border: '1px solid #000',
-                                        padding: '5px',
-                                        marginBottom: '5px',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                    }}
+                                    className='guest-item'
                                 >
                                     <input
                                         type="checkbox"
@@ -421,6 +359,7 @@ function SeatingCanvas({ guests }) {
                                         color="primary"
                                         onClick={() => handleAddPlusOne(guest)}
                                         style={{ marginLeft: '10px' }}
+                                        className='save-button'
                                     >
                                         <Icon>exposure_plus_1</Icon>
                                     </Button>
@@ -440,14 +379,7 @@ function SeatingCanvas({ guests }) {
                                                 const newName = prompt('Enter new name for this guest:', plusOne.firstName);
                                                 if (newName) renamePlusOne(plusOne.id, newName);
                                             }}
-                                            style={{
-                                                border: '1px solid #ccc',
-                                                padding: '5px',
-                                                marginLeft: '20px',
-                                                marginBottom: '5px',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                            }}
+                                            className='plus-one-label'
                                         >
                                             <input
                                                 type="checkbox"
@@ -473,13 +405,7 @@ function SeatingCanvas({ guests }) {
                         <div
                             draggable
                             onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
-                            style={{
-                                border: '1px solid #ccc',
-                                padding: '5px',
-                                marginBottom: '5px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                            }}
+                            className='guest-item'
                         >
                             <input
                                 type="checkbox"
@@ -507,6 +433,7 @@ function SeatingCanvas({ guests }) {
                             )
                             .map((plusOne) => (
                                 <div
+                                className="plus-one-label"
                                     key={plusOne.id}
                                     draggable
                                     onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
@@ -514,14 +441,7 @@ function SeatingCanvas({ guests }) {
                                         const newName = prompt('Enter new name for this guest:', plusOne.firstName);
                                         if (newName) renamePlusOne(plusOne.id, newName);
                                     }}
-                                    style={{
-                                        border: '1px solid #ccc',
-                                        padding: '5px',
-                                        marginLeft: '20px',
-                                        marginBottom: '5px',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                    }}
+                                    
                                 >
                                     <input
                                         type="checkbox"
@@ -552,6 +472,7 @@ function SeatingCanvas({ guests }) {
                         variant="contained"
                         color="primary"
                         onClick={saveArrangement}
+                        className='save-button'
                         style={{ marginBottom: '10px', marginRight: '10px' }}
                     >
                         Save Arrangement
@@ -560,6 +481,7 @@ function SeatingCanvas({ guests }) {
                         variant="contained"
                         color="secondary"
                         onClick={deleteArrangement}
+                        className='delete-button'
                         style={{ marginBottom: '10px' }}
                     >
                         Delete Arrangement
@@ -570,6 +492,7 @@ function SeatingCanvas({ guests }) {
                         variant="contained"
                         color="success"
                         onClick={exportToPDF}
+                        className='export-button'
                         style={{ marginBottom: '10px', marginRight: '10px' }}
                     >
                         Export to PDF
@@ -578,6 +501,7 @@ function SeatingCanvas({ guests }) {
                         variant="contained"
                         color="info"
                         onClick={toggleViewMode}
+                        className='switch-button'
                         style={{ marginBottom: '10px' }}
                     >
                         Switch to {viewMode === 'list' ? 'Visual View' : 'List View'}
@@ -596,6 +520,7 @@ function SeatingCanvas({ guests }) {
                     variant="contained"
                     color="error"
                     onClick={removeSelectedGuests}
+                    className='delete-button'
                     style={{ marginBottom: '10px' }}
                 >
                     Remove Selected Guests

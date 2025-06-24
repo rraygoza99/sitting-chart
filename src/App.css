@@ -1,3 +1,34 @@
+:root {
+
+  /* Paleta Principal: Jardín Moderno y Fresco */
+
+  --primary-color: #8A9A5B;           /* Verde Salvia: para la identidad principal y acciones positivas */
+  --background-color: #F5F0E8;        /* Crema Suave: un fondo cálido y orgánico que es fácil para la vista */
+  --text-color: #3A4F41;              /* Verde Oscuro: para texto principal, ofrece un contraste natural y legible */
+  --highlight-color: #C87553;          /* Terracota: para interacciones clave, selecciones y alertas */
+  
+  /* Colores de Estado (derivados de la paleta) */
+  --success-color: #8A9A5B;            /* Verde Salvia (Primario): la acción de éxito refuerza la marca */
+  --danger-color: #C87553;             /* Terracota (Acento): su tono rojizo funciona como alerta o peligro */
+  
+  /* Colores Neutros Secundarios */
+  --border-color: #D1C7B8;             /* Un gris/beige desaturado para bordes sutiles que no desentonan */
+  --table-border-color: #3A4F41;       /* Verde Oscuro (Texto): para un borde de mesa definido y en armonía */
+
+  /* Definición de Botones */
+  --button-save-color: var(--success-color);
+  --button-save-font-color: #fff;
+
+  --button-delete-color: var(--danger-color);
+  --button-delete-font-color: #fff;
+
+  --button-export-color: var(--text-color);      /* Un botón secundario, usa el color de texto para menor énfasis */
+  --button-export-font-color: #F5F0E8;           /* Texto claro (color de fondo) para contraste */
+
+  --button-switch-color: var(--highlight-color); /* Un interruptor es una interacción, usa el color de realce */
+  --button-switch-font-color: #fff;
+}
+
 .App {
   text-align: center;
 }
@@ -12,24 +43,25 @@
     animation: App-logo-spin infinite 20s linear;
   }
 }
-.guestList{
+
+.guestList {
   overflow-y: auto;
   height: 90vh;
 }
 
 .App-header {
-  background-color: #eaccf8;
+  background-color: var(--background-color);
   min-height: 1vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   font-size: 20px;
-  color: rgb(0, 0, 0);
+  color: var(--text-color);
 }
 
 .App-link {
-  color: #61dafb;
+  color: var(--primary-color);
 }
 
 @keyframes App-logo-spin {

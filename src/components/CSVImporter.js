@@ -1,5 +1,6 @@
 import React from 'react';
 import Button from '@mui/material/Button'; // Import Material-UI Button
+import './SeatingCanvas.css'; // Import your CSS file for styling
 
 function CSVImporter({ onImport }) {
     const handleFileUpload = (event) => {
@@ -31,9 +32,11 @@ function CSVImporter({ onImport }) {
                 id="fileInput"
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
+                
             />
             <Button
                 variant="contained"
+                className='export-button'
                 color="primary"
                 onClick={() => document.getElementById('fileInput').click()}
             >
