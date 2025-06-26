@@ -1,30 +1,36 @@
-import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import EditableList from './components/buttonAddWedding/Button';
 import './App.css';
-import CSVImporter from './components/CSVImporter';
-import SeatingCanvas from './components/SeatingCanvas';
+
 
 function App() {
-    const [guests, setGuests] = useState([]);
+  return (
+    <BrowserRouter>
+      <div className="App">
+        <header className="App-header">
+          <h1>Wedding Seating Arrangement</h1>
+        </header>
 
-    const handleImport = (importedGuests) => {
-        setGuests((prevGuests) => {
-            const existingGuestIDs = new Set(prevGuests.map(guest => guest.id));
-            const filteredGuests = importedGuests.filter(
-                guest => !existingGuestIDs.has(guest.id) // Avoid duplicates based on ID
-            );
-            return [...prevGuests, ...filteredGuests];
-        });
-    };
+        <Routes>
+          {/* Ruta principal que muestra el componente de añadir invitados */}
+          <Route path="/" element={<EditableList />} />
 
-    return (
-        <div className="App">
-            <header className="App-header">
-                <h1>Wedding Seating Arrangement</h1>
-                <CSVImporter onImport={handleImport} />
-                <SeatingCanvas guests={guests} />
-            </header>
-        </div>
-    );
+          {/* Ruta dinámica para invitados seleccionados */}
+          <Route path="/:name" element={<BlankPage />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+}
+
+// Página en blanco para redirecciones como /NombreInvitado
+function BlankPage() {
+  return (
+    <div style={{ padding: '2rem', textAlign: 'center' }}>
+      <h2>Página en blanco</h2>
+      <p>Arreglo de mesas</p>
+    </div>
+  );
 }
 
 export default App;
