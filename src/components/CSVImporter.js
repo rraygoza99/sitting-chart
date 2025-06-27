@@ -1,44 +1,68 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import Button from '@mui/material/Button'; // Import Material-UI Button
 import './SeatingCanvas.css'; // Import your CSS file for styling
 
 function CSVImporter({ onImport }) {
+    const fileInputRef = useRef(null);
+
     const handleFileUpload = (event) => {
         const file = event.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            const csvData = e.target.result;
-            const rows = csvData.split('\n').map(row => row.split(','));
-            const guests = rows
-                .filter(row => row.length >= 4 && row[0].trim() && row[1].trim() && row[3].trim()) // Ensure valid rows with firstName, lastName, group, and ID
-                .map(([firstName, lastName, group, id]) => ({
-                    firstName: firstName.trim(),
-                    lastName: lastName.trim(),
-                    group: group ? group.trim() : '',
-                    id: id.trim(), // Import ID column
-                }));
-            onImport(guests);
+            try {
+                const csvData = e.target.result;
+                console.log('Raw CSV data:', csvData); // Debug log
+                
+                const rows = csvData.split('\n')
+                    .map(row => row.split(','))
+                    .filter(row => row.length >= 2 && row[0].trim() && row[1].trim()); // More flexible filtering
+                
+                console.log('Parsed rows:', rows); // Debug log
+                
+                const guests = rows.map((row, index) => {
+                    const firstName = row[0] ? row[0].trim() : '';
+                    const lastName = row[1] ? row[1].trim() : '';
+                    const group = row[2] ? row[2].trim() : 'Ungrouped';
+                    const id = row[3] ? row[3].trim() : `csv-guest-${Date.now()}-${index}`;
+                    
+                    return {
+                        firstName,
+                        lastName,
+                        group,
+                        id
+                    };
+                }).filter(guest => guest.firstName && guest.lastName); // Filter out empty guests
+                
+                console.log('Processed guests:', guests); // Debug log
+                
+                if (guests.length === 0) {
+                    alert('No valid guests found in CSV. Please check the format:\nfirstName,lastName,group,id');
+                    return;
+                }
+                
+                onImport(guests);
+            } catch (error) {
+                console.error('Error processing CSV:', error);
+                alert('Error processing CSV file. Please check the format.');
+            }
         };
         reader.readAsText(file);
-    };
-
-    return (
+    };    return (
         <div style={{ marginBottom: '10px' }}>
             <input
                 type="file"
                 accept=".csv"
-                id="fileInput"
                 style={{ display: 'none' }}
                 onChange={handleFileUpload}
-                
+                ref={fileInputRef}
             />
             <Button
                 variant="contained"
                 className='export-button'
                 color="primary"
-                onClick={() => document.getElementById('fileInput').click()}
+                onClick={() => fileInputRef.current?.click()}
             >
                 Import CSV
             </Button>

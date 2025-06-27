@@ -1,0 +1,23 @@
+.inputWrapper {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-start;
+    column-gap: 2rem!important;
+    margin-left: 2rem;
+    margin-top: 1rem;
+}
+.add-wedding-btn {
+    margin-left: 2rem;
+    margin-top: 1rem;
+    background-color: var(--primary-color) !important;
+}
+.import-button{
+    background-color: var(--success-color) !important;
+}
+.wedding-item{
+    border-radius: 5px;
+}
+.wedding-item:hover{
+    background-color: var(--hover-color);
+    cursor: pointer;
+}

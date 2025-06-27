@@ -27,6 +27,8 @@
 
   --button-switch-color: var(--highlight-color); /* Un interruptor es una interacción, usa el color de realce */
   --button-switch-font-color: #fff;
+
+  --hover-color: #b1b0ae;          /* Un color neutro para hover, no distrae de la paleta principal */
 }
 
 .App {
