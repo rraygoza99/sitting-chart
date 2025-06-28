@@ -8,6 +8,10 @@ import ExposurePlus1Icon from '@mui/icons-material/Exposure'; // Import Material
 import Icon from '@mui/material/Icon'; // Import Material-UI Icon
 import IconButton from '@mui/material/IconButton'; // Import Material-UI IconButton
 import CloseIcon from '@mui/icons-material/Close'; // Import Material-UI Close icon
+import Modal from '@mui/material/Modal'; // Import Material-UI Modal
+import Box from '@mui/material/Box'; // Import Material-UI Box
+import TextField from '@mui/material/TextField'; // Import Material-UI TextField
+import Typography from '@mui/material/Typography'; // Import Material-UI Typography
 import CSVImporter from './CSVImporter'; // Import CSVImporter component
 import './SeatingCanvas.css'; // Import the CSS file
 
@@ -21,6 +25,10 @@ function SeatingCanvas({ guests = [] }) {
     const [alertMessage, setAlertMessage] = useState(''); // Alert message
     const [alertOpen, setAlertOpen] = useState(false); // Alert visibility
     const [alertSeverity, setAlertSeverity] = useState('success'); // Severity of the alert
+    const [editModalOpen, setEditModalOpen] = useState(false); // Edit modal visibility
+    const [editingGuest, setEditingGuest] = useState(null); // Guest being edited
+    const [editFirstName, setEditFirstName] = useState(''); // First name in edit modal
+    const [editLastName, setEditLastName] = useState(''); // Last name in edit modal
 
     const handleCloseAlert = () => setAlertOpen(false); // Close alert handler    // Generate the localStorage key based on wedding ID
     const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
@@ -111,35 +119,62 @@ function SeatingCanvas({ guests = [] }) {
         doc.setFontSize(16);
         doc.text('Wedding Seating Arrangement', 10, 10);
 
-        let currentY = 20; // Start Y position for content
-        const pageHeight = 280; // Height of the page in the PDF
+        // Create a list of all guests with their table assignments
+        const allGuests = [];
+        tables.forEach((table, tableIndex) => {
+            table.forEach((guest) => {
+                allGuests.push({
+                    ...guest,
+                    tableNumber: tableIndex + 1
+                });
+            });
+        });
 
-        tables.forEach((table, index) => {
-            if (currentY + 20 > pageHeight) {
+        // Sort guests alphabetically by last name
+        allGuests.sort((a, b) => {
+            const lastNameA = (a.lastName || '').toLowerCase();
+            const lastNameB = (b.lastName || '').toLowerCase();
+            return lastNameA.localeCompare(lastNameB);
+        });
+
+        let currentY = 30; // Start Y position for content
+        const pageHeight = 280; // Height of the page in the PDF
+        const rowHeight = 8; // Height of each row
+        const columnWidths = [60, 60, 30]; // Column widths: Last Name, First Name, Table #
+
+        // Draw table headers
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('Last Name', 10, currentY);
+        doc.text('First Name', 10 + columnWidths[0], currentY);
+        doc.text('Table #', 10 + columnWidths[0] + columnWidths[1], currentY);
+        
+        // Draw header underline
+        doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
+        currentY += 10;
+
+        // Draw guest data
+        doc.setFont(undefined, 'normal');
+        allGuests.forEach((guest) => {
+            if (currentY + rowHeight > pageHeight) {
                 doc.addPage(); // Add a new page if content exceeds the page height
-                currentY = 10; // Reset Y position for the new page
+                currentY = 20; // Reset Y position for the new page
+                
+                // Redraw headers on new page
+                doc.setFont(undefined, 'bold');
+                doc.text('Last Name', 10, currentY);
+                doc.text('First Name', 10 + columnWidths[0], currentY);
+                doc.text('Table #', 10 + columnWidths[0] + columnWidths[1], currentY);
+                doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
+                currentY += 10;
+                doc.setFont(undefined, 'normal');
             }
 
-            doc.setFontSize(14);
-            doc.text(`Table ${index + 1}`, 10, currentY);
-            currentY += 10;
-
-            table.forEach((guest) => {
-                if (currentY + 10 > pageHeight) {
-                    doc.addPage(); // Add a new page if content exceeds the page height
-                    currentY = 10; // Reset Y position for the new page
-                }
-
-                doc.setFontSize(12);
-                doc.text(
-                    `${guest.firstName} ${guest.lastName}`,
-                    20,
-                    currentY
-                );
-                currentY += 10;
-            });
-
-            currentY += 10; // Add spacing between tables
+            // Draw guest data in columns
+            doc.text(guest.lastName || '', 10, currentY);
+            doc.text(guest.firstName || '', 10 + columnWidths[0], currentY);
+            doc.text(guest.tableNumber.toString(), 10 + columnWidths[0] + columnWidths[1], currentY);
+            currentY += rowHeight;
         });
 
         doc.save('Wedding_Seating_Arrangement.pdf');
@@ -268,14 +303,31 @@ function SeatingCanvas({ guests = [] }) {
         setSelectedGuests(new Set()); // Clear selected guests
     };
 
-    const renamePlusOne = (guestId, newName) => {
+    const openEditModal = (guestId, currentFirstName, currentLastName = '') => {
+        setEditingGuest(guestId);
+        setEditFirstName(currentFirstName.replace(' +1', ''));
+        setEditLastName(currentLastName);
+        setEditModalOpen(true);
+    };
+
+    const closeEditModal = () => {
+        setEditModalOpen(false);
+        setEditingGuest(null);
+        setEditFirstName('');
+        setEditLastName('');
+    };
+
+    const saveGuestEdit = () => {
+        if (!editingGuest || !editFirstName.trim()) return;
+
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
-                guest.id === guestId && guest.firstName.includes('+1')
-                    ? { ...guest, firstName: newName, lastName: '' } // Rename "+1" guest and clear last name
+                guest.id === editingGuest && guest.firstName.includes('+1')
+                    ? { ...guest, firstName: editFirstName.trim(), lastName: editLastName.trim() }
                     : guest
             )
         );
+        closeEditModal();
     };
 
     const renderListView = () => (
@@ -466,8 +518,7 @@ function SeatingCanvas({ guests = [] }) {
                                             draggable
                                             onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
                                             onDoubleClick={() => {
-                                                const newName = prompt('Enter new name for this guest:', plusOne.firstName);
-                                                if (newName) renamePlusOne(plusOne.id, newName);
+                                                openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName);
                                             }}
                                             className='plus-one-label'
                                         >
@@ -528,8 +579,7 @@ function SeatingCanvas({ guests = [] }) {
                                     draggable
                                     onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
                                     onDoubleClick={() => {
-                                        const newName = prompt('Enter new name for this guest:', plusOne.firstName);
-                                        if (newName) renamePlusOne(plusOne.id, newName);
+                                        openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName);
                                     }}
                                     
                                 >
@@ -549,8 +599,65 @@ function SeatingCanvas({ guests = [] }) {
         }
     };
 
+    const modalStyle = {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 400,
+        bgcolor: 'background.paper',
+        border: '2px solid #000',
+        boxShadow: 24,
+        p: 4,
+    };
+
     return (
         <div style={{ display: 'flex' }}>
+            {/* Edit Guest Modal */}
+            <Modal
+                open={editModalOpen}
+                onClose={closeEditModal}
+                aria-labelledby="edit-guest-modal-title"
+                aria-describedby="edit-guest-modal-description"
+            >
+                <Box sx={modalStyle}>
+                    <Typography id="edit-guest-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
+                        Edit Guest Information
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        label="First Name"
+                        value={editFirstName}
+                        onChange={(e) => setEditFirstName(e.target.value)}
+                        margin="normal"
+                        variant="outlined"
+                    />
+                    <TextField
+                        fullWidth
+                        label="Last Name"
+                        value={editLastName}
+                        onChange={(e) => setEditLastName(e.target.value)}
+                        margin="normal"
+                        variant="outlined"
+                    />
+                    <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                        <Button
+                            variant="outlined"
+                            onClick={closeEditModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={saveGuestEdit}
+                            disabled={!editFirstName.trim()}
+                        >
+                            Save
+                        </Button>
+                    </Box>
+                </Box>
+            </Modal>
+
             <Snackbar open={alertOpen} autoHideDuration={3000} onClose={handleCloseAlert}>
                 <Alert onClose={handleCloseAlert} severity={alertSeverity}>
                     {alertMessage}
