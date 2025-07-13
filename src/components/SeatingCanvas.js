@@ -320,13 +320,26 @@ function SeatingCanvas({ guests = [] }) {
     const saveGuestEdit = () => {
         if (!editingGuest || !editFirstName.trim()) return;
 
+        // Update guest in guestList
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
-                guest.id === editingGuest && guest.firstName.includes('+1')
+                guest.id === editingGuest
                     ? { ...guest, firstName: editFirstName.trim(), lastName: editLastName.trim() }
                     : guest
             )
         );
+
+        // Update guest in tables
+        setTables(prevTables =>
+            prevTables.map(table =>
+                table.map(guest =>
+                    guest.id === editingGuest
+                        ? { ...guest, firstName: editFirstName.trim(), lastName: editLastName.trim() }
+                        : guest
+                )
+            )
+        );
+
         closeEditModal();
     };
 
@@ -363,14 +376,25 @@ function SeatingCanvas({ guests = [] }) {
                             <span>
                                 {guest.firstName} {guest.lastName}
                             </span>
-                            <IconButton
-                                onClick={() => handleRemove(guest, tableIndex)}
-                                style={{ marginLeft: '10px' }}
-                                color="error"
-                                size="small"
-                            >
-                                <CloseIcon />
-                            </IconButton>
+                            <div style={{ marginLeft: '10px', display: 'flex', gap: '5px' }}>
+                                {/* Edit button for all guests */}
+                                <IconButton
+                                    onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
+                                    color="primary"
+                                    size="small"
+                                    title="Edit guest name"
+                                >
+                                    <Icon>edit</Icon>
+                                </IconButton>
+                                <IconButton
+                                    onClick={() => handleRemove(guest, tableIndex)}
+                                    color="error"
+                                    size="small"
+                                    title="Remove from table"
+                                >
+                                    <CloseIcon />
+                                </IconButton>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -437,14 +461,8 @@ function SeatingCanvas({ guests = [] }) {
                                     );
                                 }}
                                 onDoubleClick={() => {
-                                    setTables(prevTables => {
-                                        const updatedTables = [...prevTables];
-                                        updatedTables[tableIndex] = updatedTables[tableIndex].filter(
-                                            assigned => assigned.id !== guest.id
-                                        );
-                                        return updatedTables;
-                                    });
-                                    setGuestList(prevGuestList => [...prevGuestList, guest]);
+                                    // Double-click to edit any guest
+                                    openEditModal(guest.id, guest.firstName, guest.lastName);
                                 }}
                                 className='visual-table-guest-item'
                                 style={{
