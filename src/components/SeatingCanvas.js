@@ -29,6 +29,7 @@ function SeatingCanvas({ guests = [] }) {
     const [editingGuest, setEditingGuest] = useState(null);
     const [editFirstName, setEditFirstName] = useState('');
     const [editLastName, setEditLastName] = useState('');
+    const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
 
     const handleCloseAlert = () => setAlertOpen(false);
     const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
@@ -276,6 +277,17 @@ const saveArrangement = async () => {
     const getTotalTickets=(guestId)=>{
         return guestList.filter(guest => guest.originalGuestId === guestId).length + 1; // +1 for the original guest
     };
+
+    // Check if a guest ID can be used for adding +1 guests
+    const canAddPlusOne = (guestId) => {
+        const idStr = String(guestId);
+        // If it's just a number, allow it
+        if (!isNaN(parseInt(idStr, 10)) && isFinite(idStr)) {
+            return true;
+        }
+
+        return false;
+    };
     const handleAddPlusOne = (guest) => {
         
         setGuestList(prevGuestList => [
@@ -308,6 +320,22 @@ const saveArrangement = async () => {
             prevGuestList.filter(guest => !selectedGuests.has(guest.id))
         );
         setSelectedGuests(new Set());
+        setContextMenu({ visible: false, x: 0, y: 0 }); // Hide context menu
+    };
+
+    const handleContextMenu = (e) => {
+        if (selectedGuests.size > 1) {
+            e.preventDefault();
+            setContextMenu({
+                visible: true,
+                x: e.clientX,
+                y: e.clientY
+            });
+        }
+    };
+
+    const hideContextMenu = () => {
+        setContextMenu({ visible: false, x: 0, y: 0 });
     };
 
     const openEditModal = (guestId, currentFirstName, currentLastName = '') => {
@@ -486,6 +514,7 @@ const saveArrangement = async () => {
                 return getGuestOrder(a).localeCompare(getGuestOrder(b));
             });
             }
+            console.log('Grouped Guests:', groupedGuests);
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3>{groupName}</h3>
@@ -516,6 +545,7 @@ const saveArrangement = async () => {
                                             e.dataTransfer.setData('guest', JSON.stringify(guest));
                                         }
                                     }}
+                                    onContextMenu={handleContextMenu}
                                     className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                                 >
                                     <input
@@ -528,15 +558,17 @@ const saveArrangement = async () => {
                                         {guest.firstName} {guest.lastName}
                                     </span>
                                     <div style={{ display: 'flex', gap: '5px' }}>
-                                        <Button
-                                            variant="contained"
-                                            color="primary"
-                                            onClick={() => handleAddPlusOne(guest)}
-                                            style={{ marginLeft: '10px' }}
-                                            className='save-button'
-                                        >
-                                            <Icon>exposure_plus_1</Icon>
-                                        </Button>
+                                        {canAddPlusOne(guest.id) && (
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                onClick={() => handleAddPlusOne(guest)}
+                                                style={{ marginLeft: '10px' }}
+                                                className='save-button'
+                                            >
+                                                <Icon>exposure_plus_1</Icon>
+                                            </Button>
+                                        )}
                                         <IconButton
                                             onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
                                             color="primary"
@@ -595,6 +627,7 @@ const saveArrangement = async () => {
                                     e.dataTransfer.setData('guest', JSON.stringify(guest));
                                 }
                             }}
+                            onContextMenu={handleContextMenu}
                             className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                         >
                             <input
@@ -615,14 +648,16 @@ const saveArrangement = async () => {
                                 >
                                     <Icon>edit</Icon>
                                 </IconButton>
-                                <Button
-                                    variant="contained"
-                                    color="primary"
-                                    onClick={() => handleAddPlusOne(guest)}
-                                    style={{ marginLeft: '10px' }}
-                                >
-                                    <ExposurePlus1Icon />
-                                </Button>
+                                {canAddPlusOne(guest.id) && (
+                                    <Button
+                                        variant="contained"
+                                        color="primary"
+                                        onClick={() => handleAddPlusOne(guest)}
+                                        style={{ marginLeft: '10px' }}
+                                    >
+                                        <ExposurePlus1Icon />
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -643,7 +678,39 @@ const saveArrangement = async () => {
     };
 
     return (
-        <div style={{ display: 'flex' }}>
+        <div style={{ display: 'flex' }} onClick={hideContextMenu}>
+            {/* Context Menu */}
+            {contextMenu.visible && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: contextMenu.y,
+                        left: contextMenu.x,
+                        backgroundColor: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: '4px',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                        zIndex: 1000,
+                        minWidth: '150px'
+                    }}
+                >
+                    <div
+                        style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            borderBottom: '1px solid #eee'
+                        }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            removeSelectedGuests();
+                        }}
+                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                        onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                    >
+                        Delete Selected Guests ({selectedGuests.size})
+                    </div>
+                </div>
+            )}
             {/* Edit Guest Modal */}
             <Modal
                 open={editModalOpen}
