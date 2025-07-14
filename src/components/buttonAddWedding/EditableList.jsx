@@ -3,60 +3,59 @@ import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import "./EditableList.css";
-import ListSubheader from '@mui/material/ListSubheader';
 import List from '@mui/material/List';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import ListItem from '@mui/material/ListItem';
 
-
 function EditableList() {
-    const [inputEnabled, setInputEnabled] = useState(false);
     const [inputValue, setInputValue] = useState('');
     const [items, setItems] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null);
     const navigate = useNavigate();
+    
     useEffect(() => {
         const storedItems = JSON.parse(localStorage.getItem('weddingItems')) || [];
         setItems(storedItems);
     }, []);
+    
     const handleAddClick = () => {
         const trimmed = inputValue.trim();
-            if (trimmed && !trimmed.includes(' ')) {                if (editingIndex !== null) {
-                    const newItems = [...items];
-                    newItems[editingIndex] = trimmed;
-                    setItems(newItems);
-                    localStorage.setItem('weddingItems', JSON.stringify(newItems));
-                    setEditingIndex(null);
-                } else {
+        if (trimmed && !trimmed.includes(' ')) {
+            if (editingIndex !== null) {
+                const newItems = [...items];
+                newItems[editingIndex] = trimmed;
+                setItems(newItems);
+                localStorage.setItem('weddingItems', JSON.stringify(newItems));
+                setEditingIndex(null);
+            } else {
+                if (!items.includes(trimmed)) {
                     const newItems = [...items, trimmed];
                     setItems(newItems);
                     localStorage.setItem('weddingItems', JSON.stringify(newItems));
+                } else {
+                    alert('Wedding name already exists!');
                 }
-                setInputValue('');
-                setInputEnabled(false);
-            } else {
-                alert('El nombre no debe tener espacios.');
             }
-    };
-
-    const handleInputChange = (e) => {
-        setInputValue(e.target.value);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') {
-            
+            setInputValue('');
+        } else {
+            alert('Please enter a valid wedding name (no spaces allowed)');
         }
-    };    const handleDelete = (index, event) => {
-        event.stopPropagation(); // Prevent event bubbling to parent ListItem
-        const newItems = [...items];
-        const weddingName = items[index]; // Get the wedding name before removing it
-        newItems.splice(index, 1);
+    };
+
+    const handleEditClick = (index) => {
+        setInputValue(items[index]);
+        setEditingIndex(index);
+    };
+
+    const handleDeleteClick = (weddingName) => {
+        const isConfirmed = window.confirm(`Are you sure you want to delete "${weddingName}"?`);
+        if (!isConfirmed) return;
+        
+        const newItems = items.filter(item => item !== weddingName);
         setItems(newItems);
         localStorage.setItem('weddingItems', JSON.stringify(newItems));
         
+        // Remove the wedding arrangement data from localStorage
         const arrangementKey = `weddingArrangement-${weddingName}`;
         localStorage.removeItem(arrangementKey);
     };
@@ -76,7 +75,8 @@ function EditableList() {
                 
                 // Validate JSON structure
                 if (!jsonData.weddingName) {
-                    throw new Error('Invalid JSON format. Missing wedding name.');
+                    alert('Invalid JSON format. Missing wedding name.');
+                    return;
                 }
 
                 const weddingName = jsonData.weddingName;
@@ -102,14 +102,14 @@ function EditableList() {
                 };
                 localStorage.setItem(storageKey, JSON.stringify(arrangementData));
 
-                alert(`Successfully imported wedding arrangement: "${weddingName}" with ${jsonData.totalGuests || 0} guests!`);
+                alert(`Wedding "${weddingName}" imported successfully!`);
                 
                 // Navigate to the imported wedding
                 navigate(`/wedding/${weddingName}`);
 
             } catch (error) {
-                console.error('Error importing JSON:', error);
-                alert('Error importing JSON file. Please check the file format.');
+                alert('Error parsing JSON file. Please ensure it\'s a valid wedding arrangement file.');
+                console.error('JSON parse error:', error);
             }
         };
         reader.readAsText(file);
@@ -117,65 +117,55 @@ function EditableList() {
         // Reset the input so the same file can be imported again
         event.target.value = '';
     };
-    
 
     return (
-        <div>        <div className="inputWrapper">
-            <TextField
-                id="standard-basic"
-                variant="standard"
-                value={inputValue}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder="Ingrese un nombre sin espacios"
-                style={{ minWidth: '250px' }}
-            />
-
-            <Button
-                variant="outlined"
-                onClick={handleAddClick}
-            >
-                Añadir
-            </Button>
-        </div>
-        
-        <div style={{ margin: '1rem 2rem' }}>
-            <input
-                type="file"
-                accept=".json"
-                id="jsonImporter"
-                style={{ display: 'none' }}
-                onChange={handleJSONImport}
-            />
-            <Button
-                variant="contained"
-                color="secondary"
-                className='import-button'
-                onClick={() => document.getElementById('jsonImporter').click()}
-                style={{ marginBottom: '10px' }}
-            >
-                Import Wedding from JSON
-            </Button>
-        </div>
-        <List sx={{ width: '100%', maxWidth: 360, bgcolor: 'background.paper' }}>
-            {items.map((item, index) => (
-                    <ListItem
-                        key={index}
-                        onClick={() => handleRedirect(item)}
-                        className="wedding-item flex items-center justify-between bg-gray-100 px-3 py-2 rounded cursor-pointer hover:bg-gray-200"                        secondaryAction={
-                            <Button
-                                variant="contained"
-                                color='primary'
-                                onClick={(e) => handleDelete(index, e)}
-                                className="add-wedding-btn">Eliminar</Button>
+        <div>
+            <div className="inputWrapper">
+                <TextField
+                    id="standard-basic"
+                    variant="standard"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    placeholder="Enter wedding name"
+                    onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                            handleAddClick();
                         }
-                    >
-                        <ListItemText
-                            primary={item}/>
+                    }}
+                />
+                <Button variant="contained" onClick={handleAddClick}>
+                    {editingIndex !== null ? 'Update' : 'Add'}
+                </Button>
+            </div>
+            
+            <div style={{ margin: '1rem 2rem' }}>
+                <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleJSONImport}
+                    style={{ display: 'none' }}
+                    id="json-import-input"
+                />
+                <label htmlFor="json-import-input">
+                    <Button variant="outlined" component="span">
+                        Import JSON File
+                    </Button>
+                </label>
+            </div>
+
+            <List>
+                {items.map((item, index) => (
+                    <ListItem key={index} className="listItem">
+                        <ListItemText primary={item} />
+                        <div className="buttonGroup">
+                            <Button onClick={() => handleRedirect(item)}>Open</Button>
+                            <Button onClick={() => handleEditClick(index)}>Edit</Button>
+                            <Button onClick={() => handleDeleteClick(item)}>Delete</Button>
+                        </div>
                     </ListItem>
                 ))}
-        </List>
-        </div>     
+            </List>
+        </div>
     );
 }
 

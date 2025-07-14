@@ -1,36 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
-import Button from '@mui/material/Button'; // Import Material-UI Button
-import Alert from '@mui/material/Alert'; // Import Material-UI Alert
-import Snackbar from '@mui/material/Snackbar'; // Import Material-UI Snackbar
-import ExposurePlus1Icon from '@mui/icons-material/Exposure'; // Import Material-UI ExposurePlus1 icon
-import Icon from '@mui/material/Icon'; // Import Material-UI Icon
-import IconButton from '@mui/material/IconButton'; // Import Material-UI IconButton
-import CloseIcon from '@mui/icons-material/Close'; // Import Material-UI Close icon
-import Modal from '@mui/material/Modal'; // Import Material-UI Modal
-import Box from '@mui/material/Box'; // Import Material-UI Box
-import TextField from '@mui/material/TextField'; // Import Material-UI TextField
-import Typography from '@mui/material/Typography'; // Import Material-UI Typography
-import CSVImporter from './CSVImporter'; // Import CSVImporter component
-import './SeatingCanvas.css'; // Import the CSS file
+import Button from '@mui/material/Button';
+import Alert from '@mui/material/Alert';
+import Snackbar from '@mui/material/Snackbar';
+import ExposurePlus1Icon from '@mui/icons-material/Exposure';
+import Icon from '@mui/material/Icon';
+import IconButton from '@mui/material/IconButton';
+import CloseIcon from '@mui/icons-material/Close';
+import Modal from '@mui/material/Modal';
+import Box from '@mui/material/Box';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+import CSVImporter from './CSVImporter';
+import './SeatingCanvas.css';
 
 function SeatingCanvas({ guests = [] }) {
-    const { name: weddingId } = useParams(); // Get wedding name from URL and use it as weddingId
+    const { name: weddingId } = useParams();
     const [tables, setTables] = useState([]);
     const [guestList, setGuestList] = useState([]);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'visual'
-    const [isGrouped, setIsGrouped] = useState(true); // Toggle for grouping
-    const [selectedGuests, setSelectedGuests] = useState(new Set()); // Track selected guests
-    const [alertMessage, setAlertMessage] = useState(''); // Alert message
-    const [alertOpen, setAlertOpen] = useState(false); // Alert visibility
-    const [alertSeverity, setAlertSeverity] = useState('success'); // Severity of the alert
-    const [editModalOpen, setEditModalOpen] = useState(false); // Edit modal visibility
-    const [editingGuest, setEditingGuest] = useState(null); // Guest being edited
-    const [editFirstName, setEditFirstName] = useState(''); // First name in edit modal
-    const [editLastName, setEditLastName] = useState(''); // Last name in edit modal
+    const [isGrouped, setIsGrouped] = useState(true);
+    const [selectedGuests, setSelectedGuests] = useState(new Set());
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertOpen, setAlertOpen] = useState(false);
+    const [alertSeverity, setAlertSeverity] = useState('success');
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editingGuest, setEditingGuest] = useState(null);
+    const [editFirstName, setEditFirstName] = useState('');
+    const [editLastName, setEditLastName] = useState('');
 
-    const handleCloseAlert = () => setAlertOpen(false); // Close alert handler    // Generate the localStorage key based on wedding ID
+    const handleCloseAlert = () => setAlertOpen(false);
     const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
         const storageKey = `weddingArrangement-${weddingId || 'default'}`;
         const savedData = localStorage.getItem(storageKey);
@@ -41,12 +41,10 @@ function SeatingCanvas({ guests = [] }) {
                 setTables(savedTables || []);
             } catch (error) {
                 console.error('Error parsing saved data:', error);
-                // If parsing fails, initialize with empty arrays
                 setGuestList([]);
                 setTables([]);
             }
         } else {
-            // Only initialize with props guests if no saved data exists
             const initialGuestList = guests.map((guest, index) => ({
                 ...guest,
                 id: guest.id || `guest-${Date.now()}-${index}`,
@@ -56,8 +54,7 @@ function SeatingCanvas({ guests = [] }) {
             const requiredTables = Math.ceil(Math.max(totalGuests, 1) / 10);
             setTables(Array(requiredTables).fill([]));        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [weddingId]); // Only depend on weddingId to prevent infinite loops
-      // Separate useEffect to handle initial guests loading (only run once)
+    }, [weddingId]);
     useEffect(() => {
         if (guests.length > 0 && guestList.length === 0) {
             const initialGuestList = guests.map((guest, index) => ({
@@ -67,7 +64,7 @@ function SeatingCanvas({ guests = [] }) {
             setGuestList(initialGuestList);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Empty dependency array - only run once on mount
+    }, []);
 
     const updateTables = (guestListLength) => {
         const totalGuests = guestListLength + tables.flat().length;
@@ -78,29 +75,30 @@ function SeatingCanvas({ guests = [] }) {
     };    const handleCSVImport = (importedGuests) => {
         const newGuests = importedGuests.map((guest, index) => ({
             ...guest,
-            id: guest.id || `imported-guest-${Date.now()}-${index}`, // Ensure unique IDs
+            id: guest.id || `imported-guest-${Date.now()}-${index}`,
         }));
         
         setGuestList(prevGuestList => {
-            // Filter out any duplicates based on ID
             const filteredNewGuests = newGuests.filter(newGuest => 
                 !prevGuestList.some(existing => existing.id === newGuest.id)
             );
             return [...prevGuestList, ...filteredNewGuests];
         });
 
-        // Update tables to accommodate new guests
         updateTables(guestList.length + newGuests.length);
         
         setAlertMessage(`Successfully imported ${newGuests.length} guests!`);
         setAlertSeverity('success');
         setAlertOpen(true);
-    };const saveArrangement = () => {
+    };
+
+const saveArrangement = async () => {
         const dataToSave = {
             savedGuestList: guestList,
             savedTables: tables,
         };
         localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
+        
         setAlertMessage('Arrangement saved successfully!');
         setAlertSeverity('success');
         setAlertOpen(true);
@@ -119,7 +117,6 @@ function SeatingCanvas({ guests = [] }) {
         doc.setFontSize(16);
         doc.text('Wedding Seating Arrangement', 10, 10);
 
-        // Create a list of all guests with their table assignments
         const allGuests = [];
         tables.forEach((table, tableIndex) => {
             table.forEach((guest) => {
@@ -130,37 +127,32 @@ function SeatingCanvas({ guests = [] }) {
             });
         });
 
-        // Sort guests alphabetically by last name
         allGuests.sort((a, b) => {
             const lastNameA = (a.lastName || '').toLowerCase();
             const lastNameB = (b.lastName || '').toLowerCase();
             return lastNameA.localeCompare(lastNameB);
         });
 
-        let currentY = 30; // Start Y position for content
-        const pageHeight = 280; // Height of the page in the PDF
-        const rowHeight = 8; // Height of each row
-        const columnWidths = [60, 60, 30]; // Column widths: Last Name, First Name, Table #
+        let currentY = 30;
+        const pageHeight = 280;
+        const rowHeight = 8;
+        const columnWidths = [60, 60, 30];
 
-        // Draw table headers
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('Last Name', 10, currentY);
         doc.text('First Name', 10 + columnWidths[0], currentY);
         doc.text('Table #', 10 + columnWidths[0] + columnWidths[1], currentY);
         
-        // Draw header underline
         doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
         currentY += 10;
 
-        // Draw guest data
         doc.setFont(undefined, 'normal');
         allGuests.forEach((guest) => {
             if (currentY + rowHeight > pageHeight) {
-                doc.addPage(); // Add a new page if content exceeds the page height
-                currentY = 20; // Reset Y position for the new page
+                doc.addPage();
+                currentY = 20;
                 
-                // Redraw headers on new page
                 doc.setFont(undefined, 'bold');
                 doc.text('Last Name', 10, currentY);
                 doc.text('First Name', 10 + columnWidths[0], currentY);
@@ -170,7 +162,6 @@ function SeatingCanvas({ guests = [] }) {
                 doc.setFont(undefined, 'normal');
             }
 
-            // Draw guest data in columns
             doc.text(guest.lastName || '', 10, currentY);
             doc.text(guest.firstName || '', 10 + columnWidths[0], currentY);
             doc.text(guest.tableNumber.toString(), 10 + columnWidths[0] + columnWidths[1], currentY);
@@ -200,11 +191,9 @@ function SeatingCanvas({ guests = [] }) {
             }
         };
 
-        // Create blob and download
         const dataStr = JSON.stringify(arrangementData, null, 2);
         const dataBlob = new Blob([dataStr], { type: 'application/json' });
         
-        // Create download link
         const url = URL.createObjectURL(dataBlob);
         const link = document.createElement('a');
         link.href = url;
@@ -222,31 +211,47 @@ function SeatingCanvas({ guests = [] }) {
     const toggleViewMode = () => {
         setViewMode(prevMode => (prevMode === 'list' ? 'visual' : 'list'));
     };    const handleDrop = (guest, tableIndex) => {
-        const fromTableIndex = parseInt(guest.fromTableIndex, 10); // Extract the original table index
+        const fromTableIndex = parseInt(guest.fromTableIndex, 10);
         
-        // If dropping in the same table, do nothing to prevent duplication
         if (fromTableIndex === tableIndex) {
             return;
         }
         
+        const isMultiDrag = guest.isMultiDrag;
+        const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
+        
         setTables(prevTables => {
             const updatedTables = [...prevTables];
-            if (!isNaN(fromTableIndex) && fromTableIndex !== tableIndex) {
-                // Remove guest from the original table
-                updatedTables[fromTableIndex] = updatedTables[fromTableIndex].filter(
-                    assigned => assigned.id !== guest.id
-                );
-            }
-            // Add guest to the new table
-            updatedTables[tableIndex] = [...updatedTables[tableIndex], guest];
+            
+            guestsToMove.forEach(guestToMove => {
+                const guestFromTableIndex = parseInt(guestToMove.fromTableIndex, 10);
+                
+                if (!isNaN(guestFromTableIndex) && guestFromTableIndex !== tableIndex) {
+                    updatedTables[guestFromTableIndex] = updatedTables[guestFromTableIndex].filter(
+                        assigned => assigned.id !== guestToMove.id
+                    );
+                }
+                updatedTables[tableIndex] = [...updatedTables[tableIndex], guestToMove];
+            });
+            
             return updatedTables;
         });
 
-        // Remove guest from guestList (only if not moving between tables)
-        if (isNaN(fromTableIndex)) {
-            setGuestList(prevGuestList =>
-                prevGuestList.filter(unassigned => unassigned.id !== guest.id)
-            );
+        setGuestList(prevGuestList => {
+            let updatedGuestList = [...prevGuestList];
+            
+            guestsToMove.forEach(guestToMove => {
+                const guestFromTableIndex = parseInt(guestToMove.fromTableIndex, 10);
+                if (isNaN(guestFromTableIndex)) {
+                    updatedGuestList = updatedGuestList.filter(unassigned => unassigned.id !== guestToMove.id);
+                }
+            });
+            
+            return updatedGuestList;
+        });
+
+        if (isMultiDrag) {
+            setSelectedGuests(new Set());
         }
     };
 
@@ -257,7 +262,6 @@ function SeatingCanvas({ guests = [] }) {
             return updatedTables;
         });
 
-        // Add guest back to guestList
         setGuestList(prevGuestList => [...prevGuestList, guest]);
     };
 
@@ -275,13 +279,13 @@ function SeatingCanvas({ guests = [] }) {
             ...prevGuestList,
             {
                 firstName: `${guest.firstName} +1`,
-                lastName: '', // Clear last name for "+1" guests
+                lastName: '',
                 group: guest.group,
-                originalGuestId: guest.id, // Reference to the original guest
-                id: `guest-${Date.now()}-${Math.random()}`, // Generate unique ID for each "+1"
+                originalGuestId: guest.id,
+                id: `guest-${Date.now()}-${Math.random()}`,
             },
         ]);
-        updateTables(guestList.length + 1); // Update tables to account for the new "+1" guest
+        updateTables(guestList.length + 1);
     };
 
     const handleSelectGuest = (guestId) => {
@@ -300,7 +304,7 @@ function SeatingCanvas({ guests = [] }) {
         setGuestList(prevGuestList =>
             prevGuestList.filter(guest => !selectedGuests.has(guest.id))
         );
-        setSelectedGuests(new Set()); // Clear selected guests
+        setSelectedGuests(new Set());
     };
 
     const openEditModal = (guestId, currentFirstName, currentLastName = '') => {
@@ -320,7 +324,6 @@ function SeatingCanvas({ guests = [] }) {
     const saveGuestEdit = () => {
         if (!editingGuest || !editFirstName.trim()) return;
 
-        // Update guest in guestList
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
                 guest.id === editingGuest
@@ -329,7 +332,6 @@ function SeatingCanvas({ guests = [] }) {
             )
         );
 
-        // Update guest in tables
         setTables(prevTables =>
             prevTables.map(table =>
                 table.map(guest =>
@@ -411,32 +413,7 @@ function SeatingCanvas({ guests = [] }) {
                     key={tableIndex}
                     onDragOver={(e) => e.preventDefault()}                    onDrop={(e) => {
                         const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                        const fromTableIndex = parseInt(guest.fromTableIndex, 10); // Extract the original table index
-                        
-                        // If dropping in the same table, do nothing to prevent duplication
-                        if (fromTableIndex === tableIndex) {
-                            return;
-                        }
-                        
-                        setTables(prevTables => {
-                            const updatedTables = [...prevTables];
-                            if (!isNaN(fromTableIndex) && fromTableIndex !== tableIndex) {
-                                // Remove guest from the original table
-                                updatedTables[fromTableIndex] = updatedTables[fromTableIndex].filter(
-                                    assigned => assigned.id !== guest.id
-                                );
-                            }
-                            // Add guest to the new table
-                            updatedTables[tableIndex] = [...updatedTables[tableIndex], guest];
-                            return updatedTables;
-                        });
-                        
-                        // Remove guest from guestList (only if not moving between tables)
-                        if (isNaN(fromTableIndex)) {
-                            setGuestList(prevGuestList =>
-                                prevGuestList.filter(unassigned => unassigned.id !== guest.id)
-                            );
-                        }
+                        handleDrop(guest, tableIndex);
                     }}
                     className='visual-table-border'
                 >
@@ -502,8 +479,27 @@ function SeatingCanvas({ guests = [] }) {
                                 {/* Original guest */}
                                 <div
                                     draggable
-                                    onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
-                                    className='guest-item'
+                                    onDragStart={(e) => {
+                                        // Check if this guest is selected and if there are multiple selected guests
+                                        const isSelected = selectedGuests.has(guest.id);
+                                        const hasMultipleSelected = selectedGuests.size > 1;
+                                        
+                                        if (isSelected && hasMultipleSelected) {
+                                            // Multi-guest drag: get all selected guests
+                                            const selectedGuestsList = guestList.filter(g => selectedGuests.has(g.id));
+                                            e.dataTransfer.setData('guest', JSON.stringify({
+                                                isMultiDrag: true,
+                                                selectedGuests: selectedGuestsList,
+                                                id: 'multi-drag', // Placeholder ID for multi-drag
+                                                firstName: `${selectedGuests.size} guests`,
+                                                lastName: ''
+                                            }));
+                                        } else {
+                                            // Single guest drag
+                                            e.dataTransfer.setData('guest', JSON.stringify(guest));
+                                        }
+                                    }}
+                                    className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                                 >
                                     <input
                                         type="checkbox"
@@ -514,15 +510,26 @@ function SeatingCanvas({ guests = [] }) {
                                     <span>
                                         {guest.firstName} {guest.lastName}
                                     </span>
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        onClick={() => handleAddPlusOne(guest)}
-                                        style={{ marginLeft: '10px' }}
-                                        className='save-button'
-                                    >
-                                        <Icon>exposure_plus_1</Icon>
-                                    </Button>
+                                    <div style={{ display: 'flex', gap: '5px' }}>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            onClick={() => handleAddPlusOne(guest)}
+                                            style={{ marginLeft: '10px' }}
+                                            className='save-button'
+                                        >
+                                            <Icon>exposure_plus_1</Icon>
+                                        </Button>
+                                        <IconButton
+                                            onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
+                                            color="primary"
+                                            size="small"
+                                            title="Edit guest name"
+                                        >
+                                            <Icon>edit</Icon>
+                                        </IconButton>
+                                        
+                                    </div>
                                 </div>
                                 {/* "+1" guests */}
                                 {guestList
@@ -535,9 +542,6 @@ function SeatingCanvas({ guests = [] }) {
                                             key={plusOne.id}
                                             draggable
                                             onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
-                                            onDoubleClick={() => {
-                                                openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName);
-                                            }}
                                             className='plus-one-label'
                                         >
                                             <input
@@ -549,6 +553,15 @@ function SeatingCanvas({ guests = [] }) {
                                             <span>
                                                 {plusOne.firstName} {plusOne.lastName}
                                             </span>
+                                            <IconButton
+                                                onClick={() => openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName)}
+                                                color="primary"
+                                                size="small"
+                                                title="Edit guest name"
+                                                style={{ marginLeft: '10px' }}
+                                            >
+                                                <Icon>edit</Icon>
+                                            </IconButton>
                                         </div>
                                     ))}
                             </div>
@@ -563,8 +576,27 @@ function SeatingCanvas({ guests = [] }) {
                         {/* Original guest */}
                         <div
                             draggable
-                            onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(guest))}
-                            className='guest-item'
+                            onDragStart={(e) => {
+                                // Check if this guest is selected and if there are multiple selected guests
+                                const isSelected = selectedGuests.has(guest.id);
+                                const hasMultipleSelected = selectedGuests.size > 1;
+                                
+                                if (isSelected && hasMultipleSelected) {
+                                    // Multi-guest drag: get all selected guests
+                                    const selectedGuestsList = guestList.filter(g => selectedGuests.has(g.id));
+                                    e.dataTransfer.setData('guest', JSON.stringify({
+                                        isMultiDrag: true,
+                                        selectedGuests: selectedGuestsList,
+                                        id: 'multi-drag', // Placeholder ID for multi-drag
+                                        firstName: `${selectedGuests.size} guests`,
+                                        lastName: ''
+                                    }));
+                                } else {
+                                    // Single guest drag
+                                    e.dataTransfer.setData('guest', JSON.stringify(guest));
+                                }
+                            }}
+                            className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                         >
                             <input
                                 type="checkbox"
@@ -575,14 +607,24 @@ function SeatingCanvas({ guests = [] }) {
                             <span>
                                 {guest.firstName} {guest.lastName}
                             </span>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={() => handleAddPlusOne(guest)}
-                                style={{ marginLeft: '10px' }}
-                            >
-                                <ExposurePlus1Icon />
-                            </Button>
+                            <div style={{ display: 'flex', gap: '5px' }}>
+                                <IconButton
+                                    onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
+                                    color="primary"
+                                    size="small"
+                                    title="Edit guest name"
+                                >
+                                    <Icon>edit</Icon>
+                                </IconButton>
+                                <Button
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={() => handleAddPlusOne(guest)}
+                                    style={{ marginLeft: '10px' }}
+                                >
+                                    <ExposurePlus1Icon />
+                                </Button>
+                            </div>
                         </div>
                         {/* "+1" guests */}
                         {guestList
@@ -596,10 +638,6 @@ function SeatingCanvas({ guests = [] }) {
                                     key={plusOne.id}
                                     draggable
                                     onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
-                                    onDoubleClick={() => {
-                                        openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName);
-                                    }}
-                                    
                                 >
                                     <input
                                         type="checkbox"
@@ -610,6 +648,15 @@ function SeatingCanvas({ guests = [] }) {
                                     <span>
                                         {plusOne.firstName} {plusOne.lastName}
                                     </span>
+                                    <IconButton
+                                        onClick={() => openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName)}
+                                        color="primary"
+                                        size="small"
+                                        title="Edit guest name"
+                                        style={{ marginLeft: '10px' }}
+                                    >
+                                        <Icon>edit</Icon>
+                                    </IconButton>
                                 </div>
                             ))}
                     </div>
@@ -728,7 +775,9 @@ function SeatingCanvas({ guests = [] }) {
                     >
                         Switch to {viewMode === 'list' ? 'Visual View' : 'List View'}
                     </Button>
-                </div>                <div>
+                </div>
+                
+                <div>
                     <CSVImporter onImport={handleCSVImport} />
                 </div>
                 <label style={{ display: 'block', marginBottom: '10px' }}>
@@ -751,6 +800,19 @@ function SeatingCanvas({ guests = [] }) {
                 </Button>
                 <h2>Guest List</h2>
                 <p>Total Guests: {guestList.length}</p>
+                {selectedGuests.size > 1 && (
+                    <div style={{ 
+                        padding: '8px 12px', 
+                        backgroundColor: '#e3f2fd', 
+                        border: '1px solid #2196f3', 
+                        borderRadius: '4px', 
+                        marginBottom: '10px',
+                        fontSize: '14px',
+                        color: '#1976d2'
+                    }}>
+                        <strong>{selectedGuests.size} guests selected</strong> - Drag any selected guest to move all together
+                    </div>
+                )}
                 {renderGuestList()}
             </div>
             {viewMode === 'list' ? renderListView() : renderVisualView()}
