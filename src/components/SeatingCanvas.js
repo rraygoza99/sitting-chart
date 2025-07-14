@@ -472,22 +472,20 @@ const saveArrangement = async () => {
 
             const sortedGroups = Object.keys(groupedGuests).sort();
             for(var group of sortedGroups) {
-    groupedGuests[group].sort((a, b) => {
-        // Extract the base guest ID and number for proper sorting
-        const getGuestOrder = (guest) => {
-            if (guest.originalGuestId) {
-                const parts = guest.id.split('-');
-                const sequenceNum = parseInt(parts[parts.length - 1], 10) || 0;
-                return `${guest.originalGuestId}-${sequenceNum.toString().padStart(3, '0')}`;
-            } else {
-                return `${guest.id}-000`;
-            }
-        };
+                groupedGuests[group].sort((a, b) => {
+                    const getGuestOrder = (guest) => {
+                    if (guest.originalGuestId) {
+                        const parts = guest.id.split('-');
+                        const sequenceNum = parseInt(parts[parts.length - 1], 10) || 0;
+                        return `${guest.originalGuestId}-${sequenceNum.toString().padStart(3, '0')}`;
+                    } else {
+                        return `${guest.id}-000`;
+                    }
+                };
         
-        return getGuestOrder(a).localeCompare(getGuestOrder(b));
-    });
-}
-            console.log('Grouped Guests:', groupedGuests);
+                return getGuestOrder(a).localeCompare(getGuestOrder(b));
+            });
+            }
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3>{groupName}</h3>
@@ -557,8 +555,21 @@ const saveArrangement = async () => {
                 </div>
             ));
         } else {
+
             return guestList
-                .filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
+                .sort((a, b) => {
+                    const getGuestOrder = (guest) => {
+                        if (guest.originalGuestId) {
+                            const parts = guest.id.split('-');
+                            const sequenceNum = parseInt(parts[parts.length - 1], 10) || 0;
+                            return `${guest.originalGuestId}-${sequenceNum.toString().padStart(3, '0')}`;
+                        } else {
+                            return `${guest.id}-000`;
+                        }
+                    }
+                    return getGuestOrder(a).localeCompare(getGuestOrder(b));
+                })
+                //.filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
                 .map((guest) => (
                     <div key={guest.id}>
                         {/* Original guest */}
@@ -614,39 +625,6 @@ const saveArrangement = async () => {
                                 </Button>
                             </div>
                         </div>
-                        {/* "+1" guests */}
-                        {guestList
-                            .filter(
-                                plusOne =>
-                                    plusOne.originalGuestId === guest.id // Ensure "+1" guests are tied to their original guest
-                            )
-                            .map((plusOne) => (
-                                <div
-                                className="plus-one-label"
-                                    key={plusOne.id}
-                                    draggable
-                                    onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedGuests.has(plusOne.id)}
-                                        onChange={() => handleSelectGuest(plusOne.id)}
-                                        style={{ marginRight: '10px' }}
-                                    />
-                                    <span>
-                                        {plusOne.firstName} {plusOne.lastName}
-                                    </span>
-                                    <IconButton
-                                        onClick={() => openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName)}
-                                        color="primary"
-                                        size="small"
-                                        title="Edit guest name"
-                                        style={{ marginLeft: '10px' }}
-                                    >
-                                        <Icon>edit</Icon>
-                                    </IconButton>
-                                </div>
-                            ))}
                     </div>
                 ));
         }
