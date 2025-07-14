@@ -273,16 +273,19 @@ const saveArrangement = async () => {
             return updatedTables;
         });
     };*/
-
+    const getTotalTickets=(guestId)=>{
+        return guestList.filter(guest => guest.originalGuestId === guestId).length + 1; // +1 for the original guest
+    };
     const handleAddPlusOne = (guest) => {
+        
         setGuestList(prevGuestList => [
             ...prevGuestList,
             {
-                firstName: `${guest.firstName} +1`,
-                lastName: '',
+                firstName: `${guest.firstName}`,
+                lastName: `${guest.lastName} +1`,
                 group: guest.group,
                 originalGuestId: guest.id,
-                id: `guest-${Date.now()}-${Math.random()}`,
+                id: `${guest.id}-${getTotalTickets(guest.id)+1}`, // Unique ID based on original guest ID and count of tickets
             },
         ]);
         updateTables(guestList.length + 1);
@@ -467,13 +470,29 @@ const saveArrangement = async () => {
                 return groups;
             }, {});
 
-            const sortedGroups = Object.keys(groupedGuests).sort(); // Sort group names alphabetically
-
+            const sortedGroups = Object.keys(groupedGuests).sort();
+            for(var group of sortedGroups) {
+    groupedGuests[group].sort((a, b) => {
+        // Extract the base guest ID and number for proper sorting
+        const getGuestOrder = (guest) => {
+            if (guest.originalGuestId) {
+                const parts = guest.id.split('-');
+                const sequenceNum = parseInt(parts[parts.length - 1], 10) || 0;
+                return `${guest.originalGuestId}-${sequenceNum.toString().padStart(3, '0')}`;
+            } else {
+                return `${guest.id}-000`;
+            }
+        };
+        
+        return getGuestOrder(a).localeCompare(getGuestOrder(b));
+    });
+}
+            console.log('Grouped Guests:', groupedGuests);
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3>{groupName}</h3>
                     {groupedGuests[groupName]
-                        .filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
+                        //.filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
                         .map((guest) => (
                             <div key={guest.id}>
                                 {/* Original guest */}
@@ -532,38 +551,7 @@ const saveArrangement = async () => {
                                     </div>
                                 </div>
                                 {/* "+1" guests */}
-                                {guestList
-                                    .filter(
-                                        plusOne =>
-                                            plusOne.originalGuestId === guest.id // Ensure "+1" guests are tied to their original guest
-                                    )
-                                    .map((plusOne) => (
-                                        <div
-                                            key={plusOne.id}
-                                            draggable
-                                            onDragStart={(e) => e.dataTransfer.setData('guest', JSON.stringify(plusOne))}
-                                            className='plus-one-label'
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedGuests.has(plusOne.id)}
-                                                onChange={() => handleSelectGuest(plusOne.id)}
-                                                style={{ marginRight: '10px' }}
-                                            />
-                                            <span>
-                                                {plusOne.firstName} {plusOne.lastName}
-                                            </span>
-                                            <IconButton
-                                                onClick={() => openEditModal(plusOne.id, plusOne.firstName, plusOne.lastName)}
-                                                color="primary"
-                                                size="small"
-                                                title="Edit guest name"
-                                                style={{ marginLeft: '10px' }}
-                                            >
-                                                <Icon>edit</Icon>
-                                            </IconButton>
-                                        </div>
-                                    ))}
+                           
                             </div>
                         ))}
                 </div>
@@ -727,7 +715,8 @@ const saveArrangement = async () => {
                 <Alert onClose={handleCloseAlert} severity={alertSeverity}>
                     {alertMessage}
                 </Alert>
-            </Snackbar>            <div className="guestList">
+            </Snackbar>            
+            <div className="guestList">
                 <div>
                     <Button
                         variant="contained"
