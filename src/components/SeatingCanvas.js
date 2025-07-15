@@ -31,6 +31,9 @@ function SeatingCanvas({ guests = [] }) {
     const [editLastName, setEditLastName] = useState('');
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
     const [isDragOverGuestList, setIsDragOverGuestList] = useState(false);
+    const [showGroupSubmenu, setShowGroupSubmenu] = useState(false);
+    const [showNewGroupModal, setShowNewGroupModal] = useState(false);
+    const [newGroupName, setNewGroupName] = useState('');
 
     const handleCloseAlert = () => setAlertOpen(false);
     const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
@@ -426,6 +429,61 @@ const saveArrangement = async () => {
 
     const hideContextMenu = () => {
         setContextMenu({ visible: false, x: 0, y: 0 });
+        setShowGroupSubmenu(false);
+    };
+
+    const getUniqueGroups = () => {
+        const groups = new Set();
+        guestList.forEach(guest => {
+            if (guest.group) {
+                groups.add(guest.group);
+            }
+        });
+        return Array.from(groups).sort();
+    };
+
+    const changeGuestGroup = (newGroup) => {
+        setGuestList(prevGuestList =>
+            prevGuestList.map(guest =>
+                selectedGuests.has(guest.id)
+                    ? { ...guest, group: newGroup }
+                    : guest
+            )
+        );
+
+        setTables(prevTables =>
+            prevTables.map(table =>
+                table.map(guest =>
+                    selectedGuests.has(guest.id)
+                        ? { ...guest, group: newGroup }
+                        : guest
+                )
+            )
+        );
+
+        setSelectedGuests(new Set());
+        hideContextMenu();
+        
+        setAlertMessage(`Successfully changed group for ${selectedGuests.size} guest(s) to "${newGroup}"`);
+        setAlertSeverity('success');
+        setAlertOpen(true);
+    };
+
+    const openNewGroupModal = () => {
+        setShowNewGroupModal(true);
+        hideContextMenu();
+    };
+
+    const closeNewGroupModal = () => {
+        setShowNewGroupModal(false);
+        setNewGroupName('');
+    };
+
+    const saveNewGroup = () => {
+        if (!newGroupName.trim()) return;
+        
+        changeGuestGroup(newGroupName.trim());
+        closeNewGroupModal();
     };
 
     const openEditModal = (guestId, currentFirstName, currentLastName = '') => {
@@ -821,8 +879,129 @@ const saveArrangement = async () => {
                     >
                         Delete Selected Guests ({selectedGuests.size})
                     </div>
+                    <div
+                        style={{
+                            padding: '8px 12px',
+                            cursor: 'pointer',
+                            position: 'relative'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#f5f5f5';
+                            setShowGroupSubmenu(true);
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = 'white';
+                            // Don't hide submenu immediately to allow navigation
+                        }}
+                    >
+                        Change Group... ({selectedGuests.size})
+                        <span style={{ float: 'right' }}>▶</span>
+                        
+                        {/* Group Submenu */}
+                        {showGroupSubmenu && (
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    top: contextMenu.y + 60 > window.innerHeight - 200 ? 'auto' : 0,
+                                    bottom: contextMenu.y + 60 > window.innerHeight - 200 ? 0 : 'auto',
+                                    left: '100%',
+                                    backgroundColor: 'white',
+                                    border: '1px solid #ccc',
+                                    borderRadius: '4px',
+                                    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+                                    minWidth: '120px',
+                                    maxHeight: '200px',
+                                    overflowY: 'auto',
+                                    zIndex: 1001
+                                }}
+                                onMouseEnter={() => setShowGroupSubmenu(true)}
+                                onMouseLeave={() => setShowGroupSubmenu(false)}
+                            >
+                                {getUniqueGroups().map((group, index) => (
+                                    <div
+                                        key={group}
+                                        style={{
+                                            padding: '8px 12px',
+                                            cursor: 'pointer',
+                                            borderBottom: index < getUniqueGroups().length - 1 ? '1px solid #eee' : 'none'
+                                        }}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            changeGuestGroup(group);
+                                        }}
+                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                                        onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                                    >
+                                        {group}
+                                    </div>
+                                ))}
+                                {getUniqueGroups().length > 0 && (
+                                    <div style={{ borderTop: '1px solid #ddd', margin: '4px 0' }} />
+                                )}
+                                <div
+                                    style={{
+                                        padding: '8px 12px',
+                                        cursor: 'pointer',
+                                        fontStyle: 'italic',
+                                        color: '#666'
+                                    }}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        openNewGroupModal();
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                                >
+                                    Add new group...
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
+            {/* New Group Modal */}
+            <Modal
+                open={showNewGroupModal}
+                onClose={closeNewGroupModal}
+                aria-labelledby="new-group-modal-title"
+                aria-describedby="new-group-modal-description"
+            >
+                <Box sx={modalStyle}>
+                    <Typography id="new-group-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
+                        Create New Group
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        label="Group Name"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        margin="normal"
+                        variant="outlined"
+                        placeholder="Enter group name..."
+                        onKeyPress={(e) => {
+                            if (e.key === 'Enter' && newGroupName.trim()) {
+                                saveNewGroup();
+                            }
+                        }}
+                    />
+                    <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                        <Button
+                            variant="outlined"
+                            onClick={closeNewGroupModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={saveNewGroup}
+                            disabled={!newGroupName.trim()}
+                        >
+                            Create Group
+                        </Button>
+                    </Box>
+                </Box>
+            </Modal>
+
             {/* Edit Guest Modal */}
             <Modal
                 open={editModalOpen}
