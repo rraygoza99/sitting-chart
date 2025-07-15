@@ -30,6 +30,7 @@ function SeatingCanvas({ guests = [] }) {
     const [editFirstName, setEditFirstName] = useState('');
     const [editLastName, setEditLastName] = useState('');
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
+    const [isDragOverGuestList, setIsDragOverGuestList] = useState(false);
 
     const handleCloseAlert = () => setAlertOpen(false);
     const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
@@ -209,6 +210,36 @@ const saveArrangement = async () => {
         setAlertOpen(true);
     };
 
+    const downloadSampleCSV = () => {
+        // Create sample CSV data with the expected format: Firstname,Lastname,Group,ID
+        const sampleData = [
+            'John,Doe,Family,1',
+            'Jane,Doe,Family,2',
+            'Mike,Smith,Friends,3',
+            'Sarah,Johnson,Friends,4',
+            'Robert,Williams,Colleagues,5',
+            'Emily,Brown,Colleagues,6',
+            'David,Jones,Family,7',
+            'Lisa,Garcia,Friends,8'
+        ];
+
+        const csvContent = sampleData.join('\n');
+        const dataBlob = new Blob([csvContent], { type: 'text/csv' });
+        
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'sample_guest_list.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        setAlertMessage('Sample CSV downloaded successfully!');
+        setAlertSeverity('info');
+        setAlertOpen(true);
+    };
+
     const toggleViewMode = () => {
         setViewMode(prevMode => (prevMode === 'list' ? 'visual' : 'list'));
     };    const handleDrop = (guest, tableIndex) => {
@@ -256,6 +287,49 @@ const saveArrangement = async () => {
         }
     };
 
+    // Handle dropping guests back to the guest list (unassign them)
+    const handleDropToGuestList = (guest) => {
+        const fromTableIndex = parseInt(guest.fromTableIndex, 10);
+        
+        // Only process if the guest is coming from a table
+        if (!isNaN(fromTableIndex)) {
+            const isMultiDrag = guest.isMultiDrag;
+            const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
+            
+            // Remove from tables and add back to guest list
+            setTables(prevTables => {
+                const updatedTables = [...prevTables];
+                
+                guestsToMove.forEach(guestToMove => {
+                    const guestFromTableIndex = parseInt(guestToMove.fromTableIndex, 10);
+                    if (!isNaN(guestFromTableIndex)) {
+                        updatedTables[guestFromTableIndex] = updatedTables[guestFromTableIndex].filter(
+                            assigned => assigned.id !== guestToMove.id
+                        );
+                    }
+                });
+                
+                return updatedTables;
+            });
+
+            setGuestList(prevGuestList => {
+                const updatedGuestList = [...prevGuestList];
+                
+                guestsToMove.forEach(guestToMove => {
+                    // Remove the fromTableIndex property before adding back to guest list
+                    const { fromTableIndex, ...cleanGuest } = guestToMove;
+                    updatedGuestList.push(cleanGuest);
+                });
+                
+                return updatedGuestList;
+            });
+
+            if (isMultiDrag) {
+                setSelectedGuests(new Set());
+            }
+        }
+    };
+
     const handleRemove = (guest, tableIndex) => {
         setTables(prevTables => {
             const updatedTables = [...prevTables];
@@ -264,6 +338,22 @@ const saveArrangement = async () => {
         });
 
         setGuestList(prevGuestList => [...prevGuestList, guest]);
+    };
+
+    // Clear all guests from a specific table
+    const handleClearTable = (tableIndex) => {
+        setTables(prevTables => {
+            const updatedTables = [...prevTables];
+            const guestsToMove = updatedTables[tableIndex];
+            
+            // Clear the table
+            updatedTables[tableIndex] = [];
+            
+            // Add all guests back to guest list
+            setGuestList(prevGuestList => [...prevGuestList, ...guestsToMove]);
+            
+            return updatedTables;
+        });
     };
 
     /*const handleReassign = (guest, fromTableIndex, toTableIndex) => {
@@ -393,6 +483,17 @@ const saveArrangement = async () => {
                 >
                     <h3 style={{ marginBottom: '10px' }}>
                         Table {tableIndex + 1} ({table.length}/10) {/* Counter for assigned seats */}
+                        {table.length > 0 && (
+                            <IconButton
+                                onClick={() => handleClearTable(tableIndex)}
+                                color="error"
+                                size="small"
+                                title="Clear all guests from this table"
+                                style={{ marginLeft: '10px' }}
+                            >
+                                <Icon>delete</Icon>
+                            </IconButton>
+                        )}
                     </h3>
                     {table.map((guest) => (
                         <div
@@ -452,6 +553,17 @@ const saveArrangement = async () => {
                         className='visual-table-title'
                     >
                         Table {tableIndex + 1} ({table.length}/10)
+                        {table.length > 0 && (
+                            <IconButton
+                                onClick={() => handleClearTable(tableIndex)}
+                                color="error"
+                                size="small"
+                                title="Clear all guests from this table"
+                                style={{ marginLeft: '5px' }}
+                            >
+                                <Icon>clear_all</Icon>
+                            </IconButton>
+                        )}
                     </span>
                     {table.map((guest, index) => {
                         const angle = (index / 10) * 2 * Math.PI; // Divide the circle into 10 equal parts
@@ -761,7 +873,31 @@ const saveArrangement = async () => {
                     {alertMessage}
                 </Alert>
             </Snackbar>            
-            <div className="guestList">
+            <div className="guestList"
+                onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragOverGuestList(true);
+                }}
+                onDragLeave={(e) => {
+                    // Only hide if we're leaving the guest list container entirely
+                    if (!e.currentTarget.contains(e.relatedTarget)) {
+                        setIsDragOverGuestList(false);
+                    }
+                }}
+                onDrop={(e) => {
+                    e.preventDefault();
+                    const guest = JSON.parse(e.dataTransfer.getData('guest'));
+                    handleDropToGuestList(guest);
+                    setIsDragOverGuestList(false);
+                }}
+                style={{
+                    backgroundColor: isDragOverGuestList ? '#e8f5e8' : 'transparent',
+                    border: isDragOverGuestList ? '2px dashed #4caf50' : '2px dashed transparent',
+                    borderRadius: '8px',
+                    padding: '10px',
+                    transition: 'all 0.2s ease'
+                }}
+            >
                 <div>
                     <Button
                         variant="contained"
@@ -813,6 +949,15 @@ const saveArrangement = async () => {
                 
                 <div>
                     <CSVImporter onImport={handleCSVImport} />
+                    <Button
+                        variant="outlined"
+                        color="info"
+                        onClick={downloadSampleCSV}
+                        style={{ marginTop: '10px', marginLeft: '10px' }}
+                        className='download-sample-button'
+                    >
+                        📄 Download Sample CSV
+                    </Button>
                 </div>
                 <label style={{ display: 'block', marginBottom: '10px' }}>
                     <input
@@ -833,6 +978,20 @@ const saveArrangement = async () => {
                     Remove Selected Guests
                 </Button>
                 <h2>Guest List</h2>
+                {isDragOverGuestList && (
+                    <div style={{
+                        padding: '8px 12px',
+                        backgroundColor: '#c8e6c9',
+                        border: '1px solid #4caf50',
+                        borderRadius: '4px',
+                        marginBottom: '10px',
+                        fontSize: '14px',
+                        color: '#2e7d32',
+                        textAlign: 'center'
+                    }}>
+                        🔄 Drop here to unassign from table
+                    </div>
+                )}
                 <p>Total Guests: {guestList.length}</p>
                 {selectedGuests.size > 1 && (
                     <div style={{ 
