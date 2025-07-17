@@ -1646,6 +1646,8 @@ const saveArrangement = async () => {
                                     headerName: 'Group',
                                     width: 200,
                                     editable: true,
+                                    type: 'singleSelect',
+                                    valueOptions: getUniqueGroups().map(group => group || 'Ungrouped'),
                                 },
                                 {
                                     field: 'actions',
