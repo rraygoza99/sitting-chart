@@ -2,6 +2,10 @@
     background-color: var(--button-save-color) !important;
     color: var(--button-save-font-color) !important;
 }
+.plus-one-button{
+    background-color: var(--button-plus-one-color) !important;
+    color: var(--button-plus-one-font-color) !important;
+}
 .delete-button{
     background-color: var(--button-delete-color) !important;
     color: var(--button-delete-font-color) !important;
@@ -152,7 +156,7 @@
 
 .table-header {
   margin-bottom: 10px;
-  color: var(--text-color);
+  color: var(--table-header-text-color);
 }
 
 .guest-item {

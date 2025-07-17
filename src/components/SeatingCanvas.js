@@ -851,9 +851,10 @@ const saveArrangement = async () => {
                     >
                         <div className="table-header"
                         style={{
-                            ...(table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: '#f44336' } : {}),
+                            ...(table.length === getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-completed-color)', color:'var(--table-header-completed-text-color)' } : {}),
+                            ...(table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-oversized-color)', color:'var(--table-header-oversized-text-color)' } : {}),
                             ...(tableHasMatchingGuest(table) ? { 
-                                backgroundColor: '#e3f2fd', 
+                                backgroundColor: 'var(--table-header-highlight-color, #c4ce40ff)', 
                                 border: '2px solid #1976d2',
                                 boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
                             } : {})
@@ -1308,7 +1309,7 @@ const saveArrangement = async () => {
                                                 color="primary"
                                                 onClick={() => handleAddPlusOne(guest)}
                                                 style={{ marginLeft: '10px' }}
-                                                className='save-button'
+                                                className='plus-one-button'
                                             >
                                                 <Icon>exposure_plus_1</Icon>
                                             </Button>

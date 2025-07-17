@@ -9,12 +9,19 @@
   
   /* Colores de Estado (derivados de la paleta) */
   --success-color: #8A9A5B;            /* Verde Salvia (Primario): la acción de éxito refuerza la marca */
-  --danger-color: #C87553;             /* Terracota (Acento): su tono rojizo funciona como alerta o peligro */
+  --danger-color: #c9411f;             /* Terracota (Acento): su tono rojizo funciona como alerta o peligro */
   
   /* Colores Neutros Secundarios */
   --border-color: #D1C7B8;             /* Un gris/beige desaturado para bordes sutiles que no desentonan */
   --table-border-color: #3A4F41;
-  --table-header-color: #a0a58e;       /* Verde Salvia para encabezados de tabla, mantiene la coherencia */
+  --table-header-color: #152769;
+  --table-header-text-color: #ffffff;
+  --table-header-highlight-color: #4ac1c5;
+
+  --table-header-oversized-color: #f44336;
+  --table-header-oversized-text-color: #ffffff;
+  --table-header-completed-color: #2da350;
+  --table-header-completed-text-color: #ffffff;
 
   /* Definición de Botones */
   --button-save-color: var(--success-color);
@@ -28,8 +35,12 @@
 
   --button-switch-color: var(--highlight-color); /* Un interruptor es una interacción, usa el color de realce */
   --button-switch-font-color: #fff;
+  --button-plus-one-color: var(--table-header-highlight-color);
+  --button-plus-one-font-color: #fff;
 
-  --hover-color: #b1b0ae;          /* Un color neutro para hover, no distrae de la paleta principal */
+  --hover-color: #b1b0ae;
+
+ 
 }
 
 .App {
@@ -54,12 +65,12 @@
 
 .App-header {
   background-color: var(--background-color);
-  min-height: 1vh;
+  min-height: .5vh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 14px;
   color: var(--text-color);
 }
 
