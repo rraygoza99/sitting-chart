@@ -8,7 +8,11 @@ import TextField from '@mui/material/TextField';
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 
-const ConfigurationModal = () => {
+const ConfigurationModal = ({ 
+    onExportToJSON, 
+    onDeleteArrangement, 
+    weddingId 
+}) => {
     const [open, setOpen] = useState(false);
     const [defaultTableSize, setDefaultTableSize] = useState(10);
 
@@ -127,6 +131,36 @@ const ConfigurationModal = () => {
                             }}
                             variant="outlined"
                         />
+                    </Box>
+
+                    {/* Arrangement Actions */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>
+                            Arrangement Actions
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                            <Button
+                                variant="contained"
+                                color="warning"
+                                onClick={onExportToJSON}
+                                size="medium"
+                                sx={{ minWidth: '150px' }}
+                            >
+                                Export to JSON
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="error"
+                                onClick={onDeleteArrangement}
+                                size="medium"
+                                sx={{ minWidth: '150px' }}
+                            >
+                                Delete Arrangement
+                            </Button>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            {weddingId ? `Current arrangement: ${weddingId}` : 'No arrangement selected'}
+                        </Typography>
                     </Box>
 
                     <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>

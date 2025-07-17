@@ -1275,7 +1275,11 @@ const saveArrangement = async () => {
     return (
         <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}
-            <ConfigurationModal />
+            <ConfigurationModal 
+                onExportToJSON={exportToJSON}
+                onDeleteArrangement={deleteArrangement}
+                weddingId={weddingId}
+            />
             
             {/* Context Menu */}
             {contextMenu.visible && (
@@ -1646,15 +1650,6 @@ const saveArrangement = async () => {
                             >
                                 Save Arrangement
                             </Button>
-                            <Button
-                                variant="contained"
-                                color="secondary"
-                                onClick={deleteArrangement}
-                                className='delete-button'
-                                size="small"
-                            >
-                                Delete Arrangement
-                            </Button>
                         </div>
                         
                         <div className="button-row">
@@ -1665,16 +1660,7 @@ const saveArrangement = async () => {
                                 className='export-button'
                                 size="small"
                             >
-                                Export to PDF
-                            </Button>
-                            <Button
-                                variant="contained"
-                                color="warning"
-                                onClick={exportToJSON}
-                                className='export-button'
-                                size="small"
-                            >
-                                Export to JSON
+                                Export as PDF
                             </Button>
                             <Button
                                 variant="contained"
@@ -1683,7 +1669,7 @@ const saveArrangement = async () => {
                                 className='export-button'
                                 size="small"
                             >
-                                📋 Get All guests
+                                📋 Export ticket Information
                             </Button>
                             <Button
                                 variant="contained"
