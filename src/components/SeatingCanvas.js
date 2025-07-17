@@ -13,7 +13,6 @@ import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { DataGrid } from '@mui/x-data-grid';
-import CSVImporter from './CSVImporter';
 import ConfigurationModal from './ConfigurationModal';
 import './SeatingCanvas.css';
 
@@ -42,6 +41,8 @@ function SeatingCanvas({ guests = [] }) {
     const [tableNumbers, setTableNumbers] = useState({}); // Custom table numbers for PDF export
     const [showAddGuestsModal, setShowAddGuestsModal] = useState(false);
     const [newGuestsData, setNewGuestsData] = useState([]);
+    const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed groups
+    const [searchTerm, setSearchTerm] = useState(''); // Search functionality
 
     // Function to get the configured table size
     const getTableSize = useCallback(() => {
@@ -564,6 +565,68 @@ const saveArrangement = async () => {
         return Array.from(groups).sort();
     };
 
+    const toggleGroupCollapse = (groupName) => {
+        setCollapsedGroups(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(groupName)) {
+                newSet.delete(groupName);
+            } else {
+                newSet.add(groupName);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleAllGroups = () => {
+        const uniqueGroups = getUniqueGroups();
+        setCollapsedGroups(prev => {
+            // If all groups are collapsed, expand all. Otherwise, collapse all.
+            const allCollapsed = uniqueGroups.every(group => prev.has(group));
+            if (allCollapsed) {
+                return new Set(); // Expand all
+            } else {
+                return new Set(uniqueGroups); // Collapse all
+            }
+        });
+    };
+
+    const matchesSearch = (guest) => {
+        if (!searchTerm.trim()) return false;
+        const search = searchTerm.toLowerCase();
+        const firstName = (guest.firstName || '').toLowerCase();
+        const lastName = (guest.lastName || '').toLowerCase();
+        const fullName = `${firstName} ${lastName}`.trim();
+        return firstName.includes(search) || lastName.includes(search) || fullName.includes(search);
+    };
+
+    const tableHasMatchingGuest = (table) => {
+        if (!searchTerm.trim()) return false;
+        return table.some(guest => matchesSearch(guest));
+    };
+
+    const highlightSearchTerm = (text) => {
+        if (!searchTerm.trim() || !text) return text;
+        
+        const regex = new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        const parts = text.split(regex);
+        
+        return parts.map((part, index) => {
+            if (part.toLowerCase() === searchTerm.toLowerCase()) {
+                return (
+                    <span key={index} style={{ 
+                        backgroundColor: '#ffeb3b', 
+                        padding: '1px 3px',
+                        borderRadius: '3px',
+                        fontWeight: 'bold'
+                    }}>
+                        {part}
+                    </span>
+                );
+            }
+            return part;
+        });
+    };
+
     const changeGuestGroup = (newGroup) => {
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
@@ -787,7 +850,14 @@ const saveArrangement = async () => {
                         className='single-table'
                     >
                         <div className="table-header"
-                        style={table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: '#f44336' } : {}}>
+                        style={{
+                            ...(table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: '#f44336' } : {}),
+                            ...(tableHasMatchingGuest(table) ? { 
+                                backgroundColor: '#e3f2fd', 
+                                border: '2px solid #1976d2',
+                                boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
+                            } : {})
+                        }}>
                             {editingTable === tableIndex ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -890,9 +960,11 @@ const saveArrangement = async () => {
                                     }}
                                     className='table-guest-item'
                                 >
-                                    <span>
-                                        {guest.firstName} {guest.lastName}
-                                    </span>
+                                    <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                                        <span style={{ flex: 1 }}>
+                                            {highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}
+                                        </span>
+                                    </div>
                                     <div style={{ marginLeft: '10px', display: 'flex', gap: '5px' }}>
                                         <IconButton
                                             onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
@@ -936,6 +1008,13 @@ const saveArrangement = async () => {
                     >
                         <div
                             className='visual-table-title'
+                            style={{
+                                ...(tableHasMatchingGuest(table) ? { 
+                                    backgroundColor: '#e3f2fd', 
+                                    border: '2px solid #1976d2',
+                                    boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
+                                } : {})
+                            }}
                         >
                             {editingTable === tableIndex ? (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '160px' }}>
@@ -1074,7 +1153,7 @@ const saveArrangement = async () => {
                                     
                                 }}
                             >
-                                {guest.firstName} {guest.lastName}
+                                <span>{highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}</span>
                             </div>
                         );
                     })}
@@ -1112,10 +1191,67 @@ const saveArrangement = async () => {
             console.log('Grouped Guests:', groupedGuests);
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
-                    <h3>{groupName}</h3>
-                    {groupedGuests[groupName]
-                        //.filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
-                        .map((guest) => (
+                    <h3 
+                        onClick={() => toggleGroupCollapse(groupName)}
+                        style={{ 
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            margin: '0 0 10px 0',
+                            padding: '12px 16px',
+                            backgroundColor: collapsedGroups.has(groupName) ? '#f0f0f0' : '#f8f9fa',
+                            borderRadius: '6px',
+                            border: '1px solid #e0e0e0',
+                            userSelect: 'none',
+                            transition: 'all 0.2s ease',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
+                        }}
+                        onMouseEnter={(e) => {
+                            e.target.style.backgroundColor = '#e8f0fe';
+                            e.target.style.borderColor = '#2196f3';
+                        }}
+                        onMouseLeave={(e) => {
+                            e.target.style.backgroundColor = collapsedGroups.has(groupName) ? '#f0f0f0' : '#f8f9fa';
+                            e.target.style.borderColor = '#e0e0e0';
+                        }}
+                    >
+                        <span style={{ 
+                            fontSize: '16px', 
+                            fontWeight: 'bold',
+                            color: '#2196f3',
+                            transition: 'transform 0.2s ease',
+                            transform: collapsedGroups.has(groupName) ? 'rotate(0deg)' : 'rotate(90deg)'
+                        }}>
+                            ▶
+                        </span>
+                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
+                            {groupName}
+                        </span>
+                        <span style={{ 
+                            fontSize: '13px', 
+                            color: '#666', 
+                            marginLeft: 'auto',
+                            fontWeight: 'normal',
+                            backgroundColor: '#e3f2fd',
+                            padding: '2px 8px',
+                            borderRadius: '12px',
+                            border: '1px solid #bbdefb'
+                        }}>
+                            {groupedGuests[groupName].length} guests
+                        </span>
+                    </h3>
+                    {!collapsedGroups.has(groupName) && (
+                        <div style={{ 
+                            paddingLeft: '24px',
+                            paddingRight: '8px',
+                            marginBottom: '8px',
+                            opacity: 1,
+                            transition: 'opacity 0.3s ease'
+                        }}>
+                            {groupedGuests[groupName]
+                                //.filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
+                                .map((guest) => (
                             <div key={guest.id}>
                                 {/* Original guest */}
                                 <div
@@ -1142,6 +1278,14 @@ const saveArrangement = async () => {
                                     }}
                                     onContextMenu={handleContextMenu}
                                     className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
+                                    style={{
+                                        backgroundColor: matchesSearch(guest) ? '#e3f2fd' : 'transparent',
+                                        border: matchesSearch(guest) ? '2px solid #2196f3' : '1px solid transparent',
+                                        borderRadius: '4px',
+                                        padding: '8px',
+                                        margin: '2px 0',
+                                        transition: 'all 0.2s ease'
+                                    }}
                                 >
                                     <input
                                         type="checkbox"
@@ -1149,9 +1293,14 @@ const saveArrangement = async () => {
                                         onChange={() => handleSelectGuest(guest.id)}
                                         style={{ marginRight: '10px' }}
                                     />
-                                    <span>
-                                        {guest.firstName} {guest.lastName}
+                                    <span style={{ flex: 1 }}>
+                                        {highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}
                                     </span>
+                                    {matchesSearch(guest) && (
+                                        <Icon style={{ color: '#2196f3', fontSize: '16px', marginRight: '8px' }}>
+                                            search
+                                        </Icon>
+                                    )}
                                     <div style={{ display: 'flex', gap: '5px' }}>
                                         {canAddPlusOne(guest.id) && (
                                             <Button
@@ -1179,6 +1328,8 @@ const saveArrangement = async () => {
                            
                             </div>
                         ))}
+                        </div>
+                    )}
                 </div>
             ));
         } else {
@@ -1224,6 +1375,14 @@ const saveArrangement = async () => {
                             }}
                             onContextMenu={handleContextMenu}
                             className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
+                            style={{
+                                backgroundColor: matchesSearch(guest) ? '#e3f2fd' : 'transparent',
+                                border: matchesSearch(guest) ? '2px solid #2196f3' : '1px solid transparent',
+                                borderRadius: '4px',
+                                padding: '8px',
+                                margin: '2px 0',
+                                transition: 'all 0.2s ease'
+                            }}
                         >
                             <input
                                 type="checkbox"
@@ -1231,9 +1390,14 @@ const saveArrangement = async () => {
                                 onChange={() => handleSelectGuest(guest.id)}
                                 style={{ marginRight: '10px' }}
                             />
-                            <span>
-                                {guest.firstName} {guest.lastName}
+                            <span style={{ flex: 1 }}>
+                                {highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}
                             </span>
+                            {matchesSearch(guest) && (
+                                <Icon style={{ color: '#2196f3', fontSize: '16px', marginRight: '8px' }}>
+                                    search
+                                </Icon>
+                            )}
                             <div style={{ display: 'flex', gap: '5px' }}>
                                 <IconButton
                                     onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
@@ -1278,6 +1442,8 @@ const saveArrangement = async () => {
             <ConfigurationModal 
                 onExportToJSON={exportToJSON}
                 onDeleteArrangement={deleteArrangement}
+                onCSVImport={handleCSVImport}
+                onDownloadSampleCSV={downloadSampleCSV}
                 weddingId={weddingId}
             />
             
@@ -1620,7 +1786,6 @@ const saveArrangement = async () => {
                     {/* Action Buttons */}
                     <div className="button-section">
                         <div className="button-row">
-                            <CSVImporter onImport={handleCSVImport} />
                             <Button
                                 variant="contained"
                                 color="success"
@@ -1629,15 +1794,6 @@ const saveArrangement = async () => {
                                 size="small"
                             >
                                 ➕ Add Guests
-                            </Button>
-                            <Button
-                                variant="outlined"
-                                color="info"
-                                onClick={downloadSampleCSV}
-                                className='download-sample-button'
-                                size="small"
-                            >
-                                📄 Download Sample CSV
                             </Button>
                         </div>
                         <div className="button-row">
@@ -1680,11 +1836,6 @@ const saveArrangement = async () => {
                             >
                                 Change view mode
                             </Button>
-                        </div>
-                        
-                        
-                        
-                        <div className="button-row">
                             <Button
                                 variant="contained"
                                 color="error"
@@ -1698,15 +1849,59 @@ const saveArrangement = async () => {
                     </div>
                     
                     {/* Controls */}
-                    <label style={{ display: 'block', marginBottom: '10px' }}>
-                        <input
-                            type="checkbox"
-                            checked={isGrouped}
-                            onChange={(e) => setIsGrouped(e.target.checked)}
-                            style={{ marginRight: '5px' }}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center' }}>
+                            <input
+                                type="checkbox"
+                                checked={isGrouped}
+                                onChange={(e) => setIsGrouped(e.target.checked)}
+                                style={{ marginRight: '5px' }}
+                            />
+                            Group Guests
+                        </label>
+                        
+                        {isGrouped && (
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={toggleAllGroups}
+                                style={{ 
+                                    fontSize: '12px', 
+                                    padding: '4px 8px',
+                                    minWidth: 'auto'
+                                }}
+                            >
+                                {getUniqueGroups().every(group => collapsedGroups.has(group)) ? 'Expand All' : 'Collapse All'}
+                            </Button>
+                        )}
+                    </div>
+                    
+                    {/* Search Field */}
+                    <div style={{ marginBottom: '15px' }}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="Search guests..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            variant="outlined"
+                            InputProps={{
+                                startAdornment: (
+                                    <Icon style={{ marginRight: '8px', color: '#666' }}>search</Icon>
+                                ),
+                                endAdornment: searchTerm && (
+                                    <IconButton
+                                        size="small"
+                                        onClick={() => setSearchTerm('')}
+                                        style={{ padding: '4px' }}
+                                    >
+                                        <Icon style={{ fontSize: '18px' }}>clear</Icon>
+                                    </IconButton>
+                                )
+                            }}
+                            style={{ backgroundColor: 'white', borderRadius: '4px' }}
                         />
-                        Group Guests
-                    </label>
+                    </div>
                     
                     {/* Statistics */}
                     <p className="guest-list-stats">Total Guests: {guestList.length}</p>

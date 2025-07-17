@@ -7,10 +7,13 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
+import CSVImporter from './CSVImporter';
 
 const ConfigurationModal = ({ 
     onExportToJSON, 
     onDeleteArrangement, 
+    onCSVImport,
+    onDownloadSampleCSV,
     weddingId 
 }) => {
     const [open, setOpen] = useState(false);
@@ -131,6 +134,28 @@ const ConfigurationModal = ({
                             }}
                             variant="outlined"
                         />
+                    </Box>
+
+                    {/* CSV Import Actions */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>
+                            CSV Import
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                            <CSVImporter onImport={onCSVImport} />
+                            <Button
+                                variant="outlined"
+                                color="info"
+                                onClick={onDownloadSampleCSV}
+                                size="medium"
+                                sx={{ minWidth: '150px' }}
+                            >
+                                📄 Download Sample CSV
+                            </Button>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Import guests from CSV file or download a sample CSV template
+                        </Typography>
                     </Box>
 
                     {/* Arrangement Actions */}
