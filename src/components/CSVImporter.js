@@ -50,7 +50,7 @@ function CSVImporter({ onImport }) {
         };
         reader.readAsText(file);
     };    return (
-        <div style={{ marginBottom: '10px' }}>
+        <div>
             <input
                 type="file"
                 accept=".csv"

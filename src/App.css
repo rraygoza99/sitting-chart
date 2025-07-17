@@ -13,7 +13,8 @@
   
   /* Colores Neutros Secundarios */
   --border-color: #D1C7B8;             /* Un gris/beige desaturado para bordes sutiles que no desentonan */
-  --table-border-color: #3A4F41;       /* Verde Oscuro (Texto): para un borde de mesa definido y en armonía */
+  --table-border-color: #3A4F41;
+  --table-header-color: #a0a58e;       /* Verde Salvia para encabezados de tabla, mantiene la coherencia */
 
   /* Definición de Botones */
   --button-save-color: var(--success-color);

@@ -12,7 +12,9 @@ import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import { DataGrid } from '@mui/x-data-grid';
 import CSVImporter from './CSVImporter';
+import ConfigurationModal from './ConfigurationModal';
 import './SeatingCanvas.css';
 
 function SeatingCanvas({ guests = [] }) {
@@ -34,6 +36,26 @@ function SeatingCanvas({ guests = [] }) {
     const [showGroupSubmenu, setShowGroupSubmenu] = useState(false);
     const [showNewGroupModal, setShowNewGroupModal] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
+    const [editingTable, setEditingTable] = useState(null);
+    const [tableAliases, setTableAliases] = useState({});
+    const [tableSizes, setTableSizes] = useState({});
+    const [tableNumbers, setTableNumbers] = useState({}); // Custom table numbers for PDF export
+    const [showAddGuestsModal, setShowAddGuestsModal] = useState(false);
+    const [newGuestsData, setNewGuestsData] = useState([]);
+
+    // Function to get the configured table size
+    const getTableSize = useCallback(() => {
+        try {
+            const savedConfig = localStorage.getItem('seatingConfiguration');
+            if (savedConfig) {
+                const config = JSON.parse(savedConfig);
+                return config.defaultTableSize || 10;
+            }
+        } catch (error) {
+            console.error('Error loading table size configuration:', error);
+        }
+        return 10; // Default fallback
+    }, []);
 
     const handleCloseAlert = () => setAlertOpen(false);
     const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
@@ -56,7 +78,8 @@ function SeatingCanvas({ guests = [] }) {
             }));
             setGuestList(initialGuestList);
             const totalGuests = guests.length;
-            const requiredTables = Math.ceil(Math.max(totalGuests, 1) / 10);
+            const tableSize = getTableSize();
+            const requiredTables = Math.ceil(Math.max(totalGuests, 1) / tableSize);
             setTables(Array(requiredTables).fill([]));        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [weddingId]);
@@ -73,7 +96,8 @@ function SeatingCanvas({ guests = [] }) {
 
     const updateTables = (guestListLength) => {
         const totalGuests = guestListLength + tables.flat().length;
-        const requiredTables = Math.ceil(totalGuests / 10);
+        const tableSize = getTableSize();
+        const requiredTables = Math.ceil(totalGuests / tableSize);
         if (requiredTables > tables.length) {
             setTables(prevTables => [...prevTables, ...Array(requiredTables - prevTables.length).fill([])]);
         }
@@ -112,7 +136,8 @@ const saveArrangement = async () => {
         const initialGuestList = guests.map((guest, index) => ({ ...guest, id: `guest-${index}` }));
         setGuestList(initialGuestList.sort((a, b) => a.firstName.localeCompare(b.firstName)));
         const totalGuests = guests.length;
-        const requiredTables = Math.ceil(totalGuests / 10);
+        const tableSize = getTableSize();
+        const requiredTables = Math.ceil(totalGuests / tableSize);
         setTables(Array(requiredTables).fill([])); // Reset tables state
         setAlertMessage('Arrangement deleted successfully!');
         setAlertSeverity('warning');
@@ -127,7 +152,7 @@ const saveArrangement = async () => {
             table.forEach((guest) => {
                 allGuests.push({
                     ...guest,
-                    tableNumber: tableIndex + 1
+                    tableNumber: getTableDisplayNumber(tableIndex) // Use custom table number
                 });
             });
         });
@@ -177,6 +202,7 @@ const saveArrangement = async () => {
     };
 
     const exportToJSON = () => {
+        const tableSize = getTableSize();
         const arrangementData = {
             weddingName: weddingId,
             exportDate: new Date().toISOString(),
@@ -186,7 +212,7 @@ const saveArrangement = async () => {
             tables: tables.map((table, index) => ({
                 tableNumber: index + 1,
                 seatedGuests: table.length,
-                maxCapacity: 10,
+                maxCapacity: tableSize,
                 guests: table
             })),
             metadata: {
@@ -524,107 +550,410 @@ const saveArrangement = async () => {
         closeEditModal();
     };
 
-    const renderListView = () => (
-        <div
+    // Helper functions for table editing
+    const getTableDisplayName = (tableIndex) => {
+        return tableAliases[tableIndex] || `Table ${tableIndex + 1}`;
+    };
 
-            className='tables-container'
-        >
-            {tables.map((table, tableIndex) => (
-                <div
-                    key={tableIndex}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                        const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                        handleDrop(guest, tableIndex);
-                    }}
-                    className='single-table'
-                >
-                    <h3 style={{ marginBottom: '10px' }}>
-                        Table {tableIndex + 1} ({table.length}/10) {/* Counter for assigned seats */}
-                        {table.length > 0 && (
-                            <IconButton
-                                onClick={() => handleClearTable(tableIndex)}
-                                color="error"
-                                size="small"
-                                title="Clear all guests from this table"
-                                style={{ marginLeft: '10px' }}
-                            >
-                                <Icon>delete</Icon>
-                            </IconButton>
-                        )}
-                    </h3>
-                    {table.map((guest) => (
-                        <div
-                            key={guest.id}
-                            draggable
-                            onDragStart={(e) => {
-                                e.dataTransfer.setData(
-                                    'guest',
-                                    JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
-                                );
-                            }}
-                            className='table-guest-item'
-                        >
-                            <span>
-                                {guest.firstName} {guest.lastName}
-                            </span>
-                            <div style={{ marginLeft: '10px', display: 'flex', gap: '5px' }}>
-                                {/* Edit button for all guests */}
+    const getTableDisplaySize = (tableIndex) => {
+        return tableSizes[tableIndex] || getTableSize();
+    };
+
+    const getTableDisplayNumber = (tableIndex) => {
+        return tableNumbers[tableIndex] || (tableIndex + 1);
+    };
+
+    const handleTableAliasChange = (tableIndex, newAlias) => {
+        setTableAliases(prev => ({
+            ...prev,
+            [tableIndex]: newAlias
+        }));
+    };
+
+    const handleTableSizeChange = (tableIndex, newSize) => {
+        const size = parseInt(newSize, 10);
+        if (size > 0) {
+            setTableSizes(prev => ({
+                ...prev,
+                [tableIndex]: size
+            }));
+        }
+    };
+
+    const handleTableNumberChange = (tableIndex, newNumber) => {
+        const number = parseInt(newNumber, 10);
+        if (number > 0) {
+            setTableNumbers(prev => ({
+                ...prev,
+                [tableIndex]: number
+            }));
+        }
+    };
+
+    const handleTableEditClick = (tableIndex) => {
+        setEditingTable(tableIndex);
+    };
+
+    const handleTableEditComplete = () => {
+        setEditingTable(null);
+    };
+
+    // Helper functions for adding guests
+    const getNextGuestId = () => {
+        const allGuests = [...guestList, ...tables.flat()];
+        let maxId = 0;
+        
+        allGuests.forEach(guest => {
+            const id = guest.id;
+            if (typeof id === 'string') {
+                const numericPart = id.match(/(\d+)/);
+                if (numericPart) {
+                    const num = parseInt(numericPart[1], 10);
+                    if (num > maxId) maxId = num;
+                }
+            } else if (typeof id === 'number') {
+                if (id > maxId) maxId = id;
+            }
+        });
+        
+        return maxId + 1;
+    };
+
+    const openAddGuestsModal = () => {
+        setNewGuestsData([
+            { id: 1, firstName: '', lastName: '', group: '' }
+        ]);
+        setShowAddGuestsModal(true);
+    };
+
+    const closeAddGuestsModal = () => {
+        setShowAddGuestsModal(false);
+        setNewGuestsData([]);
+    };
+
+    const handleAddRow = () => {
+        const newRow = {
+            id: newGuestsData.length + 1,
+            firstName: '',
+            lastName: '',
+            group: ''
+        };
+        setNewGuestsData([...newGuestsData, newRow]);
+    };
+
+    const handleRemoveRow = (id) => {
+        setNewGuestsData(newGuestsData.filter(row => row.id !== id));
+    };
+
+    const saveNewGuests = () => {
+        const validGuests = newGuestsData.filter(guest => 
+            guest.firstName.trim() && guest.lastName.trim()
+        );
+        
+        if (validGuests.length === 0) {
+            setAlertMessage('Please add at least one guest with first and last name');
+            setAlertSeverity('warning');
+            setAlertOpen(true);
+            return;
+        }
+
+        let nextId = getNextGuestId();
+        const guestsToAdd = validGuests.map(guest => ({
+            firstName: guest.firstName.trim(),
+            lastName: guest.lastName.trim(),
+            group: guest.group.trim() || 'Ungrouped',
+            id: nextId++
+        }));
+
+        setGuestList(prevGuestList => [...prevGuestList, ...guestsToAdd]);
+        updateTables(guestList.length + guestsToAdd.length);
+        
+        setAlertMessage(`Successfully added ${guestsToAdd.length} guest(s)`);
+        setAlertSeverity('success');
+        setAlertOpen(true);
+        
+        closeAddGuestsModal();
+    };
+
+    const renderListView = () => {
+        const tableSize = getTableSize();
+        return (
+            <div
+                className='tables-container'
+            >
+                {tables.map((table, tableIndex) => (
+                    <div
+                        key={tableIndex}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                            const guest = JSON.parse(e.dataTransfer.getData('guest'));
+                            handleDrop(guest, tableIndex);
+                        }}
+                        className='single-table'
+                    >
+                        <div className="table-header"
+                        style={table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: '#f44336' } : {}}>
+                            {editingTable === tableIndex ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <TextField
+                                            type='text'
+                                            label="Table Alias"
+                                            size="small"
+                                            defaultValue={getTableDisplayName(tableIndex)}
+                                            style={{ flex: 1, backgroundColor: 'white', borderRadius: '4px' }}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleTableAliasChange(tableIndex, e.target.value);
+                                                    handleTableEditComplete();
+                                                }
+                                            }}
+                                        />
+                                        <TextField
+                                            type='number'
+                                            min="1"
+                                            label="Table #"
+                                            size="small"
+                                            defaultValue={getTableDisplayNumber(tableIndex)}
+                                            style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleTableNumberChange(tableIndex, e.target.value);
+                                                    handleTableEditComplete();
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <TextField
+                                            type='number'
+                                            min="1"
+                                            label="Max Size"
+                                            size="small"
+                                            defaultValue={getTableDisplaySize(tableIndex)}
+                                            style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleTableSizeChange(tableIndex, e.target.value);
+                                                    handleTableEditComplete();
+                                                }
+                                            }}
+                                        />
+                                        <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold' }}>
+                                            Current: {table.length} guests
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
+                                            {getTableDisplayName(tableIndex)}
+                                        </span>
+                                        <span style={{ fontSize: '14px' }}>
+                                            Table #{getTableDisplayNumber(tableIndex)}
+                                        </span>
+                                    </div>
+                                    <div style={{ fontSize: '14px' }}>
+                                        Seated: {table.length}/{getTableDisplaySize(tableIndex)}
+                                    </div>
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '5px' }}>
                                 <IconButton
-                                    onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
-                                    color="primary"
+                                    onClick={() => handleTableEditClick(tableIndex)}
+                                    color="inherit"
                                     size="small"
-                                    title="Edit guest name"
+                                    title="Edit table settings"
+                                    sx={{ color: 'white' }}
                                 >
                                     <Icon>edit</Icon>
                                 </IconButton>
-                                <IconButton
-                                    onClick={() => handleRemove(guest, tableIndex)}
-                                    color="error"
-                                    size="small"
-                                    title="Remove from table"
-                                >
-                                    <CloseIcon />
-                                </IconButton>
+                                {table.length > 0 && (
+                                    <IconButton
+                                        onClick={() => handleClearTable(tableIndex)}
+                                        color="inherit"
+                                        size="small"
+                                        title="Clear all guests from this table"
+                                        sx={{ color: 'white' }}
+                                    >
+                                        <Icon>delete</Icon>
+                                    </IconButton>
+                                )}
                             </div>
                         </div>
-                    ))}
-                </div>
-            ))}
-        </div>
-    );
+                        <div className="table-content">
+                            {table.map((guest) => (
+                                <div
+                                    key={guest.id}
+                                    draggable
+                                    onDragStart={(e) => {
+                                        e.dataTransfer.setData(
+                                            'guest',
+                                            JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
+                                        );
+                                    }}
+                                    className='table-guest-item'
+                                >
+                                    <span>
+                                        {guest.firstName} {guest.lastName}
+                                    </span>
+                                    <div style={{ marginLeft: '10px', display: 'flex', gap: '5px' }}>
+                                        <IconButton
+                                            onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
+                                            color="primary"
+                                            size="small"
+                                            title="Edit guest name"
+                                        >
+                                            <Icon>edit</Icon>
+                                        </IconButton>
+                                        <IconButton
+                                            onClick={() => handleRemove(guest, tableIndex)}
+                                            color="error"
+                                            size="small"
+                                            title="Remove from table"
+                                        >
+                                            <CloseIcon />
+                                        </IconButton>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
 
-    const renderVisualView = () => (
-        <div
-            className='visual-tables-container'
-        >
-            {tables.map((table, tableIndex) => (
-                <div
-                    key={tableIndex}
-                    onDragOver={(e) => e.preventDefault()}                    onDrop={(e) => {
-                        const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                        handleDrop(guest, tableIndex);
-                    }}
-                    className='visual-table-border'
-                >
-                    <span
-                        className='visual-table-title'
+    const renderVisualView = () => {
+        return (
+            <div
+                className='visual-tables-container'
+            >
+                {tables.map((table, tableIndex) => (
+                    <div
+                        key={tableIndex}
+                        onDragOver={(e) => e.preventDefault()}                    onDrop={(e) => {
+                            const guest = JSON.parse(e.dataTransfer.getData('guest'));
+                            handleDrop(guest, tableIndex);
+                        }}
+                        className='visual-table-border'
                     >
-                        Table {tableIndex + 1} ({table.length}/10)
-                        {table.length > 0 && (
-                            <IconButton
-                                onClick={() => handleClearTable(tableIndex)}
-                                color="error"
-                                size="small"
-                                title="Clear all guests from this table"
-                                style={{ marginLeft: '5px' }}
-                            >
-                                <Icon>clear_all</Icon>
-                            </IconButton>
-                        )}
-                    </span>
+                        <div
+                            className='visual-table-title'
+                        >
+                            {editingTable === tableIndex ? (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '160px' }}>
+                                    {/* First Row: Table Alias and Number */}
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                        <input
+                                            type="text"
+                                            defaultValue={getTableDisplayName(tableIndex)}
+                                            placeholder="Table name..."
+                                            
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleTableAliasChange(tableIndex, e.target.value);
+                                                    handleTableEditComplete();
+                                                }
+                                            }}
+                                            autoFocus
+                                            style={{
+                                                background: 'white',
+                                                border: '1px solid #ccc',
+                                                borderRadius: '4px',
+                                                padding: '2px 4px',
+                                                fontSize: '11px',
+                                                flex: 1
+                                            }}
+                                        />
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            defaultValue={getTableDisplayNumber(tableIndex)}
+                                            
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleTableNumberChange(tableIndex, e.target.value);
+                                                    handleTableEditComplete();
+                                                }
+                                            }}
+                                            style={{
+                                                background: 'white',
+                                                border: '1px solid #ccc',
+                                                borderRadius: '4px',
+                                                padding: '2px 4px',
+                                                fontSize: '11px',
+                                                width: '40px'
+                                            }}
+                                        />
+                                    </div>
+                                    {/* Second Row: Max Size */}
+                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                        <span style={{ fontSize: '10px', color: '#333' }}>Max:</span>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            defaultValue={getTableDisplaySize(tableIndex)}
+                                            
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    handleTableSizeChange(tableIndex, e.target.value);
+                                                    handleTableEditComplete();
+                                                }
+                                            }}
+                                            style={{
+                                                background: 'white',
+                                                border: '1px solid #ccc',
+                                                borderRadius: '4px',
+                                                padding: '2px 4px',
+                                                fontSize: '11px',
+                                                width: '40px'
+                                            }}
+                                        />
+                                        <span style={{ fontSize: '10px', color: '#333' }}>
+                                            Current: {table.length}
+                                        </span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, textAlign: 'center' }}>
+                                    {/* First Row: Table Name and Number */}
+                                    <div style={{ fontWeight: 'bold', fontSize: '13px' }}>
+                                        {getTableDisplayName(tableIndex)} #{getTableDisplayNumber(tableIndex)}
+                                    </div>
+                                    {/* Second Row: Occupancy */}
+                                    <div style={{ fontSize: '11px' }}>
+                                        {table.length}/{getTableDisplaySize(tableIndex)}
+                                    </div>
+                                </div>
+                            )}
+                            <div style={{ display: 'flex', gap: '2px' }}>
+                                <IconButton
+                                    onClick={() => handleTableEditClick(tableIndex)}
+                                    color="primary"
+                                    size="small"
+                                    title="Edit table settings"
+                                    sx={{ minWidth: '24px', minHeight: '24px', padding: '2px' }}
+                                >
+                                    <Icon sx={{ fontSize: '16px' }}>edit</Icon>
+                                </IconButton>
+                                {table.length > 0 && (
+                                    <IconButton
+                                        onClick={() => handleClearTable(tableIndex)}
+                                        color="error"
+                                        size="small"
+                                        title="Clear all guests from this table"
+                                        sx={{ minWidth: '24px', minHeight: '24px', padding: '2px' }}
+                                    >
+                                        <Icon sx={{ fontSize: '16px' }}>delete</Icon>
+                                    </IconButton>
+                                )}
+                            </div>
+                        </div>
                     {table.map((guest, index) => {
-                        const angle = (index / 10) * 2 * Math.PI; // Divide the circle into 10 equal parts
+                        const currentTableSize = getTableDisplaySize(tableIndex);
+                        const angle = (index / currentTableSize) * 2 * Math.PI; // Divide the circle into equal parts based on table size
                         const radius = 120; // Distance from the center
                         const x = 150 + radius * Math.cos(angle)-30; // Calculate x position
                         const y = 150 + radius * Math.sin(angle)-30; // Calculate y position
@@ -658,6 +987,7 @@ const saveArrangement = async () => {
             ))}
         </div>
     );
+};
 
     const renderGuestList = () => {
         if (isGrouped) {
@@ -849,6 +1179,9 @@ const saveArrangement = async () => {
 
     return (
         <div style={{ display: 'flex' }} onClick={hideContextMenu}>
+            {/* Configuration Modal Component */}
+            <ConfigurationModal />
+            
             {/* Context Menu */}
             {contextMenu.visible && (
                 <div
@@ -1002,6 +1335,112 @@ const saveArrangement = async () => {
                 </Box>
             </Modal>
 
+            {/* Add Guests Modal */}
+            <Modal
+                open={showAddGuestsModal}
+                onClose={closeAddGuestsModal}
+                aria-labelledby="add-guests-modal-title"
+                aria-describedby="add-guests-modal-description"
+            >
+                <Box sx={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 800,
+                    bgcolor: 'background.paper',
+                    border: '2px solid #000',
+                    boxShadow: 24,
+                    p: 4,
+                    maxHeight: '80vh',
+                    overflow: 'auto'
+                }}>
+                    <Typography id="add-guests-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
+                        Add New Guests
+                    </Typography>
+                    
+                    <div style={{ height: 400, width: '100%', marginBottom: '16px' }}>
+                        <DataGrid
+                            rows={newGuestsData}
+                            columns={[
+                                {
+                                    field: 'firstName',
+                                    headerName: 'First Name',
+                                    width: 200,
+                                    editable: true,
+                                },
+                                {
+                                    field: 'lastName',
+                                    headerName: 'Last Name',
+                                    width: 200,
+                                    editable: true,
+                                },
+                                {
+                                    field: 'group',
+                                    headerName: 'Group',
+                                    width: 200,
+                                    editable: true,
+                                },
+                                {
+                                    field: 'actions',
+                                    headerName: 'Actions',
+                                    width: 100,
+                                    renderCell: (params) => (
+                                        <IconButton
+                                            onClick={() => handleRemoveRow(params.row.id)}
+                                            color="error"
+                                            size="small"
+                                            disabled={newGuestsData.length === 1}
+                                        >
+                                            <CloseIcon />
+                                        </IconButton>
+                                    ),
+                                    sortable: false,
+                                    filterable: false,
+                                },
+                            ]}
+                            processRowUpdate={(newRow) => {
+                                setNewGuestsData(prevData =>
+                                    prevData.map(row => (row.id === newRow.id ? newRow : row))
+                                );
+                                return newRow;
+                            }}
+                            onProcessRowUpdateError={(error) => {
+                                console.error('Error updating row:', error);
+                            }}
+                            disableRowSelectionOnClick
+                            hideFooter
+                        />
+                    </div>
+                    
+                    <Box sx={{ mb: 2 }}>
+                        <Button
+                            variant="outlined"
+                            onClick={handleAddRow}
+                            startIcon={<Icon>add</Icon>}
+                        >
+                            Add Row
+                        </Button>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                        <Button
+                            variant="outlined"
+                            onClick={closeAddGuestsModal}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={saveNewGuests}
+                            color="primary"
+                        >
+                            Add Guests
+                        </Button>
+                    </Box>
+                </Box>
+            </Modal>
+
             {/* Edit Guest Modal */}
             <Modal
                 open={editModalOpen}
@@ -1073,119 +1512,148 @@ const saveArrangement = async () => {
                     backgroundColor: isDragOverGuestList ? '#e8f5e8' : 'transparent',
                     border: isDragOverGuestList ? '2px dashed #4caf50' : '2px dashed transparent',
                     borderRadius: '8px',
-                    padding: '10px',
                     transition: 'all 0.2s ease'
                 }}
             >
-                <div>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={saveArrangement}
-                        className='save-button'
-                        style={{ marginBottom: '10px', marginRight: '10px' }}
-                    >
-                        Save Arrangement
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="secondary"
-                        onClick={deleteArrangement}
-                        className='delete-button'
-                        style={{ marginBottom: '10px' }}
-                    >
-                        Delete Arrangement
-                    </Button>
-                </div>                <div>
-                    <Button
-                        variant="contained"
-                        color="success"
-                        onClick={exportToPDF}
-                        className='export-button'
-                        style={{ marginBottom: '10px', marginRight: '10px' }}
-                    >
-                        Export to PDF
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="warning"
-                        onClick={exportToJSON}
-                        className='export-button'
-                        style={{ marginBottom: '10px', marginRight: '10px' }}
-                    >
-                        Export to JSON
-                    </Button>
-                    <Button
-                        variant="contained"
-                        color="info"
-                        onClick={toggleViewMode}
-                        className='switch-button'
-                        style={{ marginBottom: '10px' }}
-                    >
-                        Switch to {viewMode === 'list' ? 'Visual View' : 'List View'}
-                    </Button>
+                {/* Fixed Header Section */}
+                <div className="guest-list-header">
+                    
+                    {/* Action Buttons */}
+                    <div className="button-section">
+                        <div className="button-row">
+                            <CSVImporter onImport={handleCSVImport} />
+                            <Button
+                                variant="contained"
+                                color="success"
+                                onClick={openAddGuestsModal}
+                                className='add-guests-button'
+                                size="small"
+                            >
+                                ➕ Add Guests
+                            </Button>
+                            <Button
+                                variant="outlined"
+                                color="info"
+                                onClick={downloadSampleCSV}
+                                className='download-sample-button'
+                                size="small"
+                            >
+                                📄 Download Sample CSV
+                            </Button>
+                        </div>
+                        <div className="button-row">
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={saveArrangement}
+                                className='save-button'
+                                size="small"
+                            >
+                                Save Arrangement
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="secondary"
+                                onClick={deleteArrangement}
+                                className='delete-button'
+                                size="small"
+                            >
+                                Delete Arrangement
+                            </Button>
+                        </div>
+                        
+                        <div className="button-row">
+                            <Button
+                                variant="contained"
+                                color="success"
+                                onClick={exportToPDF}
+                                className='export-button'
+                                size="small"
+                            >
+                                Export to PDF
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="warning"
+                                onClick={exportToJSON}
+                                className='export-button'
+                                size="small"
+                            >
+                                Export to JSON
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="info"
+                                onClick={toggleViewMode}
+                                className='switch-button'
+                                size="small"
+                            >
+                                Change view mode
+                            </Button>
+                        </div>
+                        
+                        
+                        
+                        <div className="button-row">
+                            <Button
+                                variant="contained"
+                                color="error"
+                                onClick={removeSelectedGuests}
+                                className='delete-button'
+                                size="small"
+                            >
+                                Remove Selected Guests
+                            </Button>
+                        </div>
+                    </div>
+                    
+                    {/* Controls */}
+                    <label style={{ display: 'block', marginBottom: '10px' }}>
+                        <input
+                            type="checkbox"
+                            checked={isGrouped}
+                            onChange={(e) => setIsGrouped(e.target.checked)}
+                            style={{ marginRight: '5px' }}
+                        />
+                        Group Guests
+                    </label>
+                    
+                    {/* Statistics */}
+                    <p className="guest-list-stats">Total Guests: {guestList.length}</p>
+                    
+                    {/* Selected guests info */}
+                    {selectedGuests.size > 1 && (
+                        <div style={{ 
+                            padding: '8px 12px', 
+                            backgroundColor: '#e3f2fd', 
+                            border: '1px solid #2196f3', 
+                            borderRadius: '4px', 
+                            fontSize: '14px',
+                            color: '#1976d2'
+                        }}>
+                            <strong>{selectedGuests.size} guests selected</strong> - Drag any selected guest to move all together
+                        </div>
+                    )}
                 </div>
                 
-                <div>
-                    <CSVImporter onImport={handleCSVImport} />
-                    <Button
-                        variant="outlined"
-                        color="info"
-                        onClick={downloadSampleCSV}
-                        style={{ marginTop: '10px', marginLeft: '10px' }}
-                        className='download-sample-button'
-                    >
-                        📄 Download Sample CSV
-                    </Button>
+                {/* Scrollable Content Section */}
+                <div className="guest-list-content">
+                    {isDragOverGuestList && (
+                        <div style={{
+                            padding: '8px 12px',
+                            backgroundColor: '#c8e6c9',
+                            border: '1px solid #4caf50',
+                            borderRadius: '4px',
+                            marginBottom: '10px',
+                            fontSize: '14px',
+                            color: '#2e7d32',
+                            textAlign: 'center'
+                        }}>
+                            🔄 Drop here to unassign from table
+                        </div>
+                    )}
+                    {renderGuestList()}
                 </div>
-                <label style={{ display: 'block', marginBottom: '10px' }}>
-                    <input
-                        type="checkbox"
-                        checked={isGrouped}
-                        onChange={(e) => setIsGrouped(e.target.checked)}
-                        style={{ marginRight: '5px' }}
-                    />
-                    Group Guests
-                </label>
-                <Button
-                    variant="contained"
-                    color="error"
-                    onClick={removeSelectedGuests}
-                    className='delete-button'
-                    style={{ marginBottom: '10px' }}
-                >
-                    Remove Selected Guests
-                </Button>
-                <h2>Guest List</h2>
-                {isDragOverGuestList && (
-                    <div style={{
-                        padding: '8px 12px',
-                        backgroundColor: '#c8e6c9',
-                        border: '1px solid #4caf50',
-                        borderRadius: '4px',
-                        marginBottom: '10px',
-                        fontSize: '14px',
-                        color: '#2e7d32',
-                        textAlign: 'center'
-                    }}>
-                        🔄 Drop here to unassign from table
-                    </div>
-                )}
-                <p>Total Guests: {guestList.length}</p>
-                {selectedGuests.size > 1 && (
-                    <div style={{ 
-                        padding: '8px 12px', 
-                        backgroundColor: '#e3f2fd', 
-                        border: '1px solid #2196f3', 
-                        borderRadius: '4px', 
-                        marginBottom: '10px',
-                        fontSize: '14px',
-                        color: '#1976d2'
-                    }}>
-                        <strong>{selectedGuests.size} guests selected</strong> - Drag any selected guest to move all together
-                    </div>
-                )}
-                {renderGuestList()}
             </div>
             {viewMode === 'list' ? renderListView() : renderVisualView()}
         </div>
