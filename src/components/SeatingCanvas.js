@@ -239,6 +239,102 @@ const saveArrangement = async () => {
         setAlertOpen(true);
     };
 
+    const exportGuestTicketsToPDF = () => {
+        const doc = new jsPDF();
+        
+        // Title
+        doc.setFontSize(18);
+        doc.text('Guest Ticket List', 20, 20);
+        
+        // Wedding name if available
+        if (weddingId) {
+            doc.setFontSize(14);
+            doc.text(`Wedding: ${weddingId}`, 20, 35);
+        }
+        
+        // Date
+        doc.setFontSize(12);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 50);
+        
+        // Get all guests (from guest list and tables) and calculate tickets
+        const allGuests = [...guestList, ...tables.flat()];
+        
+        // Group guests by their original ID to count tickets
+        const guestTicketMap = new Map();
+        
+        allGuests.forEach(guest => {
+            const originalId = guest.originalGuestId || guest.id;
+            const originalGuest = allGuests.find(g => g.id === originalId);
+            
+            if (originalGuest && !guestTicketMap.has(originalId)) {
+                // Count all related guests (main guest + plus ones)
+                const relatedGuests = allGuests.filter(g => 
+                    g.id === originalId || g.originalGuestId === originalId
+                );
+                
+                guestTicketMap.set(originalId, {
+                    fullName: `${originalGuest.firstName} ${originalGuest.lastName}`,
+                    ticketCount: relatedGuests.length
+                });
+            }
+        });
+        
+        // Convert to array and sort by full name
+        const guestTicketList = Array.from(guestTicketMap.values())
+            .sort((a, b) => a.fullName.localeCompare(b.fullName));
+        
+        // Table headers
+        doc.setFontSize(12);
+        doc.setFont(undefined, 'bold');
+        doc.text('Guest Name', 20, 70);
+        doc.text('Tickets', 150, 70);
+        
+        // Draw header line
+        doc.line(20, 72, 190, 72);
+        
+        // Table data
+        doc.setFont(undefined, 'normal');
+        let yPosition = 80;
+        let totalTickets = 0;
+        
+        guestTicketList.forEach((guest, index) => {
+            // Check if we need a new page
+            if (yPosition > 270) {
+                doc.addPage();
+                yPosition = 20;
+                
+                // Repeat headers on new page
+                doc.setFont(undefined, 'bold');
+                doc.text('Guest Name', 20, yPosition);
+                doc.text('Tickets', 150, yPosition);
+                doc.line(20, yPosition + 2, 190, yPosition + 2);
+                doc.setFont(undefined, 'normal');
+                yPosition += 10;
+            }
+            
+            doc.text(guest.fullName, 20, yPosition);
+            doc.text(guest.ticketCount.toString(), 150, yPosition);
+            totalTickets += guest.ticketCount;
+            yPosition += 7;
+        });
+        
+        // Total line
+        yPosition += 5;
+        doc.line(20, yPosition, 190, yPosition);
+        yPosition += 10;
+        doc.setFont(undefined, 'bold');
+        doc.text('Total Guests:', 20, yPosition);
+        doc.text(guestTicketList.length.toString(), 80, yPosition);
+        doc.text('Total Tickets:', 120, yPosition);
+        doc.text(totalTickets.toString(), 150, yPosition);
+        
+        doc.save(`${weddingId || 'wedding'}_guest_tickets.pdf`);
+        
+        setAlertMessage('Guest ticket list exported to PDF successfully!');
+        setAlertSeverity('success');
+        setAlertOpen(true);
+    };
+
     const downloadSampleCSV = () => {
         // Create sample CSV data with the expected format: Firstname,Lastname,Group,ID
         const sampleData = [
@@ -676,7 +772,6 @@ const saveArrangement = async () => {
     };
 
     const renderListView = () => {
-        const tableSize = getTableSize();
         return (
             <div
                 className='tables-container'
@@ -1580,6 +1675,15 @@ const saveArrangement = async () => {
                                 size="small"
                             >
                                 Export to JSON
+                            </Button>
+                            <Button
+                                variant="contained"
+                                color="primary"
+                                onClick={exportGuestTicketsToPDF}
+                                className='export-button'
+                                size="small"
+                            >
+                                📋 Get All guests
                             </Button>
                             <Button
                                 variant="contained"
