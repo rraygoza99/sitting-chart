@@ -1,18 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import Button from '@mui/material/Button';
+import ButtonGroup from '@mui/material/ButtonGroup';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
 import ExposurePlus1Icon from '@mui/icons-material/Exposure';
 import Icon from '@mui/material/Icon';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
+import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { DataGrid } from '@mui/x-data-grid';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Grow from '@mui/material/Grow';
+import Paper from '@mui/material/Paper';
+import Popper from '@mui/material/Popper';
+import MenuItem from '@mui/material/MenuItem';
+import MenuList from '@mui/material/MenuList';
 import ConfigurationModal from './ConfigurationModal';
 import './SeatingCanvas.css';
 
@@ -43,6 +51,10 @@ function SeatingCanvas({ guests = [] }) {
     const [newGuestsData, setNewGuestsData] = useState([]);
     const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed groups
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
+    
+    // Split button state for PDF export
+    const [exportMenuOpen, setExportMenuOpen] = useState(false);
+    const exportAnchorRef = useRef(null);
 
     // Function to get the configured table size
     const getTableSize = useCallback(() => {
@@ -200,6 +212,88 @@ const saveArrangement = async () => {
         });
 
         doc.save('Wedding_Seating_Arrangement.pdf');
+    };
+
+    const exportToPDFGroupedByTables = () => {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text('Wedding Seating Arrangement - Grouped by Tables', 10, 10);
+
+        let currentY = 30;
+        const pageHeight = 280;
+        const rowHeight = 8;
+        const tableHeaderHeight = 12;
+        const marginBetweenTables = 15;
+
+        tables.forEach((table, tableIndex) => {
+            if (table.length === 0) return; // Skip empty tables
+
+            const tableDisplayName = getTableDisplayName(tableIndex);
+            const tableDisplayNumber = getTableDisplayNumber(tableIndex);
+            const tableTitle = `${tableDisplayName} (Table #${tableDisplayNumber})`;
+            
+            // Check if we need a new page for this table
+            const estimatedTableHeight = tableHeaderHeight + (table.length * rowHeight) + marginBetweenTables;
+            if (currentY + estimatedTableHeight > pageHeight) {
+                doc.addPage();
+                currentY = 20;
+            }
+
+            // Table header
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(tableTitle, 10, currentY);
+            doc.setFontSize(10);
+            doc.text(`Guests: ${table.length}/${getTableDisplaySize(tableIndex)}`, 10, currentY + 8);
+            
+            currentY += tableHeaderHeight + 5;
+
+            // Sort guests by last name
+            const sortedGuests = [...table].sort((a, b) => {
+                const lastNameA = (a.lastName || '').toLowerCase();
+                const lastNameB = (b.lastName || '').toLowerCase();
+                return lastNameA.localeCompare(lastNameB);
+            });
+
+            // Guest list for this table
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            sortedGuests.forEach((guest, guestIndex) => {
+                if (currentY + rowHeight > pageHeight) {
+                    doc.addPage();
+                    currentY = 20;
+                }
+                
+                const guestName = `${guestIndex + 1}. ${guest.firstName || ''} ${guest.lastName || ''}`;
+                doc.text(guestName, 15, currentY);
+                currentY += rowHeight;
+            });
+
+            currentY += marginBetweenTables;
+        });
+
+        doc.save('Wedding_Seating_Arrangement_Grouped_by_Tables.pdf');
+    };
+
+    // Split button handlers
+    const handleExportMenuToggle = () => {
+        setExportMenuOpen((prevOpen) => !prevOpen);
+    };
+
+    const handleExportMenuClose = (event) => {
+        if (exportAnchorRef.current && exportAnchorRef.current.contains(event.target)) {
+            return;
+        }
+        setExportMenuOpen(false);
+    };
+
+    const handleExportOption = (exportType) => {
+        if (exportType === 'alphabetical') {
+            exportToPDF();
+        } else if (exportType === 'grouped') {
+            exportToPDFGroupedByTables();
+        }
+        setExportMenuOpen(false);
     };
 
     const exportToJSON = () => {
@@ -1812,15 +1906,61 @@ const saveArrangement = async () => {
                         </div>
                         
                         <div className="button-row">
-                            <Button
-                                variant="contained"
+                            <ButtonGroup 
+                                variant="contained" 
                                 color="success"
-                                onClick={exportToPDF}
-                                className='export-button'
+                                ref={exportAnchorRef}
+                                aria-label="PDF export options"
                                 size="small"
                             >
-                                Export as PDF
-                            </Button>
+                                <Button 
+                                    onClick={() => handleExportOption('alphabetical')}
+                                    className='export-button'
+                                >
+                                    Export as PDF
+                                </Button>
+                                <Button
+                                    size="small"
+                                    aria-controls={exportMenuOpen ? 'export-split-button-menu' : undefined}
+                                    aria-expanded={exportMenuOpen ? 'true' : undefined}
+                                    aria-label="select export option"
+                                    aria-haspopup="menu"
+                                    onClick={handleExportMenuToggle}
+                                >
+                                    <ArrowDropDownIcon />
+                                </Button>
+                            </ButtonGroup>
+                            <Popper
+                                sx={{ zIndex: 1 }}
+                                open={exportMenuOpen}
+                                anchorEl={exportAnchorRef.current}
+                                role={undefined}
+                                transition
+                                disablePortal
+                            >
+                                {({ TransitionProps, placement }) => (
+                                    <Grow
+                                        {...TransitionProps}
+                                        style={{
+                                            transformOrigin:
+                                                placement === 'bottom' ? 'center top' : 'center bottom',
+                                        }}
+                                    >
+                                        <Paper>
+                                            <ClickAwayListener onClickAway={handleExportMenuClose}>
+                                                <MenuList id="export-split-button-menu" autoFocusItem>
+                                                    <MenuItem onClick={() => handleExportOption('alphabetical')}>
+                                                        Alphabetical List
+                                                    </MenuItem>
+                                                    <MenuItem onClick={() => handleExportOption('grouped')}>
+                                                        Grouped by Tables
+                                                    </MenuItem>
+                                                </MenuList>
+                                            </ClickAwayListener>
+                                        </Paper>
+                                    </Grow>
+                                )}
+                            </Popper>
                             <Button
                                 variant="contained"
                                 color="primary"
