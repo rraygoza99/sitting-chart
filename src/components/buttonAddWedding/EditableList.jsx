@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
+import SettingsIcon from '@mui/icons-material/Settings';
 import "./EditableList.css";
 import List from '@mui/material/List';
 import ListItemText from '@mui/material/ListItemText';
@@ -165,6 +166,16 @@ function EditableList() {
                     </ListItem>
                 ))}
             </List>
+            <div className="footer">
+                <p>How use it?</p>
+                <p>1. Add a wedding name without spaces.</p>
+                <p>2. Click "Open" to start arranging guests.</p>
+                <p>3. Add guest with "Add Guests" button.</p>
+                <p>4. Or import the guest via CSV file, you can find an example clicking in the <SettingsIcon style={{ fontSize: '16px', verticalAlign: 'middle', color: '#666' }} /> button.</p>
+                <p>5. Share the arrangement exporting it to JSON file, you can find it in the <SettingsIcon style={{ fontSize: '16px', verticalAlign: 'middle', color: '#666' }} /> button.</p>
+                <br></br>
+                <p>If you already have a JSON file, just click in the "Import JSON file" button!</p>
+            </div>
         </div>
     );
 }

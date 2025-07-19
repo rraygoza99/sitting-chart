@@ -21,3 +21,15 @@
     background-color: var(--hover-color);
     cursor: pointer;
 }
+
+.footer {
+    color: #666;
+    font-size: 14px;
+    line-height: 1.2;
+    margin-top: 2rem;
+    padding: 1rem 2rem;
+}
+
+.footer p {
+    margin: 0.3rem 0;
+}
