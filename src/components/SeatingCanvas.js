@@ -76,13 +76,25 @@ function SeatingCanvas({ guests = [] }) {
         const savedData = localStorage.getItem(storageKey);
         if (savedData) {
             try {
-                const { savedGuestList, savedTables } = JSON.parse(savedData);
+                const { 
+                    savedGuestList, 
+                    savedTables, 
+                    savedTableAliases = {}, 
+                    savedTableSizes = {}, 
+                    savedTableNumbers = {} 
+                } = JSON.parse(savedData);
                 setGuestList(savedGuestList || []);
                 setTables(savedTables || []);
+                setTableAliases(savedTableAliases);
+                setTableSizes(savedTableSizes);
+                setTableNumbers(savedTableNumbers);
             } catch (error) {
                 console.error('Error parsing saved data:', error);
                 setGuestList([]);
                 setTables([]);
+                setTableAliases({});
+                setTableSizes({});
+                setTableNumbers({});
             }
         } else {
             const initialGuestList = guests.map((guest, index) => ({
@@ -138,6 +150,9 @@ const saveArrangement = async () => {
         const dataToSave = {
             savedGuestList: guestList,
             savedTables: tables,
+            savedTableAliases: tableAliases,
+            savedTableSizes: tableSizes,
+            savedTableNumbers: tableNumbers
         };
         localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
         
@@ -152,6 +167,9 @@ const saveArrangement = async () => {
         const tableSize = getTableSize();
         const requiredTables = Math.ceil(totalGuests / tableSize);
         setTables(Array(requiredTables).fill([])); // Reset tables state
+        setTableAliases({}); // Reset table aliases
+        setTableSizes({}); // Reset table sizes
+        setTableNumbers({}); // Reset table numbers
         setAlertMessage('Arrangement deleted successfully!');
         setAlertSeverity('warning');
         setAlertOpen(true);

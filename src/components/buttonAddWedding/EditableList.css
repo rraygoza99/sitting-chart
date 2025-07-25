@@ -33,3 +33,13 @@
 .footer p {
     margin: 0.3rem 0;
 }
+.list{
+    max-width: 40%;
+}
+.listItem{
+    border-bottom: 1px solid #000000;
+    padding: 12px 0;
+}
+.listItemText{
+    max-width: 100%;
+}

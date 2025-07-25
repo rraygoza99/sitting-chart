@@ -154,10 +154,10 @@ function EditableList() {
                 </label>
             </div>
 
-            <List>
+            <List className='list'>
                 {items.map((item, index) => (
                     <ListItem key={index} className="listItem">
-                        <ListItemText primary={item} />
+                        <ListItemText primary={item} className='listItemText' />
                         <div className="buttonGroup">
                             <Button onClick={() => handleRedirect(item)}>Open</Button>
                             <Button onClick={() => handleEditClick(index)}>Edit</Button>
