@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import SettingsIcon from '@mui/icons-material/Settings';
+import Modal from '@mui/material/Modal';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
 import "./EditableList.css";
 import List from '@mui/material/List';
 import ListItemText from '@mui/material/ListItemText';
@@ -12,6 +15,9 @@ function EditableList() {
     const [inputValue, setInputValue] = useState('');
     const [items, setItems] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null);
+    const [csvModalOpen, setCsvModalOpen] = useState(false);
+    const [csvWeddingName, setCsvWeddingName] = useState('');
+    const [csvFile, setCsvFile] = useState(null);
     const navigate = useNavigate();
     
     useEffect(() => {
@@ -119,6 +125,127 @@ function EditableList() {
         event.target.value = '';
     };
 
+    const handleCSVImportClick = () => {
+        setCsvModalOpen(true);
+    };
+
+    const handleCSVFileSelect = (event) => {
+        const file = event.target.files[0];
+        setCsvFile(file);
+        // Reset the input so the same file can be selected again
+        event.target.value = '';
+    };
+
+    const processCsvFile = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const csvData = e.target.result;
+                    console.log('Raw CSV data:', csvData);
+                    
+                    const rows = csvData.split('\n')
+                        .map(row => row.split(','))
+                        .filter(row => row.length >= 2 && row[0].trim() && row[1].trim());
+                    
+                    console.log('Parsed rows:', rows);
+                    
+                    const guests = rows.map((row, index) => {
+                        const firstName = row[0] ? row[0].trim() : '';
+                        const lastName = row[1] ? row[1].trim() : '';
+                        const group = row[2] ? row[2].trim() : 'Ungrouped';
+                        const id = row[3] ? row[3].trim() : `csv-guest-${Date.now()}-${index}`;
+                        
+                        return {
+                            firstName,
+                            lastName,
+                            group,
+                            id
+                        };
+                    }).filter(guest => guest.firstName && guest.lastName);
+                    
+                    console.log('Processed guests:', guests);
+                    resolve(guests);
+                } catch (error) {
+                    reject(error);
+                }
+            };
+            reader.readAsText(file);
+        });
+    };
+
+    const handleCSVImport = async () => {
+        const trimmedName = csvWeddingName.trim();
+        
+        if (!trimmedName) {
+            alert('Please enter a wedding name.');
+            return;
+        }
+        
+        if (trimmedName.includes(' ')) {
+            alert('Wedding name cannot contain spaces.');
+            return;
+        }
+        
+        if (!csvFile) {
+            alert('Please select a CSV file.');
+            return;
+        }
+        
+        try {
+            const guests = await processCsvFile(csvFile);
+            
+            if (guests.length === 0) {
+                alert('No valid guests found in CSV. Please check the format:\nfirstName,lastName,group,id');
+                return;
+            }
+            
+            // Check if wedding already exists
+            if (items.includes(trimmedName)) {
+                const overwrite = window.confirm(`Wedding "${trimmedName}" already exists. Do you want to overwrite it?`);
+                if (!overwrite) {
+                    return;
+                }
+            } else {
+                // Add to wedding list if it doesn't exist
+                const newItems = [...items, trimmedName];
+                setItems(newItems);
+                localStorage.setItem('weddingItems', JSON.stringify(newItems));
+            }
+            
+            // Store the arrangement data with imported guests
+            const storageKey = `weddingArrangement-${trimmedName}`;
+            const arrangementData = {
+                savedGuestList: guests,
+                savedTables: [],
+                savedTableAliases: {},
+                savedTableSizes: {},
+                savedTableNumbers: {}
+            };
+            localStorage.setItem(storageKey, JSON.stringify(arrangementData));
+            
+            alert(`Wedding "${trimmedName}" created with ${guests.length} guests imported successfully!`);
+            
+            // Reset modal state
+            setCsvModalOpen(false);
+            setCsvWeddingName('');
+            setCsvFile(null);
+            
+            // Navigate to the new wedding
+            navigate(`/wedding/${trimmedName}`);
+            
+        } catch (error) {
+            console.error('Error processing CSV:', error);
+            alert('Error processing CSV file. Please check the format.');
+        }
+    };
+
+    const handleCSVModalClose = () => {
+        setCsvModalOpen(false);
+        setCsvWeddingName('');
+        setCsvFile(null);
+    };
+
     return (
         <div>
             <div className="inputWrapper">
@@ -148,10 +275,14 @@ function EditableList() {
                     id="json-import-input"
                 />
                 <label htmlFor="json-import-input">
-                    <Button variant="outlined" component="span">
+                    <Button variant="outlined" component="span" style={{ marginRight: '1rem' }}>
                         Import JSON File
                     </Button>
                 </label>
+                
+                <Button variant="outlined" onClick={handleCSVImportClick}>
+                    Import from CSV
+                </Button>
             </div>
 
             <List className='list'>
@@ -176,6 +307,72 @@ function EditableList() {
                 <br></br>
                 <p>If you already have a JSON file, just click in the "Import JSON file" button!</p>
             </div>
+            
+            {/* CSV Import Modal */}
+            <Modal
+                open={csvModalOpen}
+                onClose={handleCSVModalClose}
+                aria-labelledby="csv-import-modal-title"
+                aria-describedby="csv-import-modal-description"
+            >
+                <Box sx={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: 400,
+                    bgcolor: 'background.paper',
+                    border: '2px solid #000',
+                    boxShadow: 24,
+                    p: 4,
+                }}>
+                    <Typography id="csv-import-modal-title" variant="h6" component="h2">
+                        Import Wedding from CSV
+                    </Typography>
+                    <Typography id="csv-import-modal-description" sx={{ mt: 2, mb: 2 }}>
+                        Enter a wedding name and select a CSV file with guest data.
+                    </Typography>
+                    
+                    <TextField
+                        fullWidth
+                        label="Wedding Name"
+                        value={csvWeddingName}
+                        onChange={(e) => setCsvWeddingName(e.target.value)}
+                        placeholder="Enter wedding name (no spaces)"
+                        sx={{ mb: 2 }}
+                    />
+                    
+                    <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleCSVFileSelect}
+                        style={{ display: 'none' }}
+                        id="csv-file-input"
+                    />
+                    <label htmlFor="csv-file-input">
+                        <Button variant="outlined" component="span" fullWidth sx={{ mb: 2 }}>
+                            {csvFile ? csvFile.name : 'Select CSV File'}
+                        </Button>
+                    </label>
+                    
+                    <Typography variant="caption" display="block" sx={{ mb: 2, color: 'text.secondary' }}>
+                        CSV format: firstName,lastName,group,id
+                    </Typography>
+                    
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Button onClick={handleCSVModalClose}>
+                            Cancel
+                        </Button>
+                        <Button 
+                            variant="contained" 
+                            onClick={handleCSVImport}
+                            disabled={!csvWeddingName.trim() || !csvFile}
+                        >
+                            Import
+                        </Button>
+                    </Box>
+                </Box>
+            </Modal>
         </div>
     );
 }
