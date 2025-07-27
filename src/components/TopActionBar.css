@@ -1,0 +1,94 @@
+.top-action-bar {
+    position: sticky;
+    top: 0;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.top-action-bar-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.top-action-bar-left,
+.top-action-bar-center,
+.top-action-bar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.top-action-bar-left {
+    flex: 1;
+    justify-content: flex-start;
+}
+
+.top-action-bar-center {
+    flex: 1;
+    justify-content: center;
+}
+
+.top-action-bar-right {
+    flex: 1;
+    justify-content: flex-end;
+}
+
+.top-action-bar .save-button {
+    font-weight: 600;
+    padding: 8px 24px;
+    border-radius: 8px;
+    text-transform: none;
+    box-shadow: 0 2px 4px rgba(25, 118, 210, 0.3);
+    transition: all 0.2s ease;
+}
+
+.top-action-bar .save-button:hover {
+    box-shadow: 0 4px 8px rgba(25, 118, 210, 0.4);
+    transform: translateY(-1px);
+}
+
+.top-action-bar .save-button:disabled {
+    box-shadow: none;
+    transform: none;
+}
+
+.top-action-bar .export-button {
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 8px;
+    text-transform: none;
+    transition: all 0.2s ease;
+}
+
+.top-action-bar .export-button:hover {
+    transform: translateY(-1px);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .top-action-bar-content {
+        padding: 8px 16px;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .top-action-bar-left,
+    .top-action-bar-center,
+    .top-action-bar-right {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .top-action-bar .save-button {
+        width: 100%;
+        max-width: 200px;
+    }
+}

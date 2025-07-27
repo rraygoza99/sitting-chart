@@ -9,7 +9,9 @@ import ExposurePlus1Icon from '@mui/icons-material/Exposure';
 import Icon from '@mui/material/Icon';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import TableBarIcon from '@mui/icons-material/TableBar';
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -22,6 +24,7 @@ import Popper from '@mui/material/Popper';
 import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import ConfigurationModal from './ConfigurationModal';
+import TopActionBar from './TopActionBar';
 import './SeatingCanvas.css';
 
 function SeatingCanvas({ guests = [] }) {
@@ -52,9 +55,9 @@ function SeatingCanvas({ guests = [] }) {
     const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed groups
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
     
-    // Split button state for PDF export
-    const [exportMenuOpen, setExportMenuOpen] = useState(false);
-    const exportAnchorRef = useRef(null);
+    // Split button state for Add actions
+    const [addMenuOpen, setAddMenuOpen] = useState(false);
+    const addAnchorRef = useRef(null);
 
     // Function to get the configured table size
     const getTableSize = useCallback(() => {
@@ -83,11 +86,22 @@ function SeatingCanvas({ guests = [] }) {
                     savedTableSizes = {}, 
                     savedTableNumbers = {} 
                 } = JSON.parse(savedData);
-                setGuestList(savedGuestList || []);
-                setTables(savedTables || []);
+                const loadedGuestList = savedGuestList || [];
+                const loadedTables = savedTables || [];
+                
+                setGuestList(loadedGuestList);
                 setTableAliases(savedTableAliases);
                 setTableSizes(savedTableSizes);
                 setTableNumbers(savedTableNumbers);
+                
+                // Check if we have guests but no tables (e.g., CSV import from home page)
+                if (loadedGuestList.length > 0 && loadedTables.length === 0) {
+                    const tableSize = getTableSize();
+                    const requiredTables = Math.ceil(loadedGuestList.length / tableSize);
+                    setTables(Array(requiredTables).fill([]));
+                } else {
+                    setTables(loadedTables);
+                }
             } catch (error) {
                 console.error('Error parsing saved data:', error);
                 setGuestList([]);
@@ -293,25 +307,25 @@ const saveArrangement = async () => {
         doc.save('Wedding_Seating_Arrangement_Grouped_by_Tables.pdf');
     };
 
-    // Split button handlers
-    const handleExportMenuToggle = () => {
-        setExportMenuOpen((prevOpen) => !prevOpen);
+    // Add button group handlers
+    const handleAddMenuToggle = () => {
+        setAddMenuOpen((prevOpen) => !prevOpen);
     };
 
-    const handleExportMenuClose = (event) => {
-        if (exportAnchorRef.current && exportAnchorRef.current.contains(event.target)) {
+    const handleAddMenuClose = (event) => {
+        if (addAnchorRef.current && addAnchorRef.current.contains(event.target)) {
             return;
         }
-        setExportMenuOpen(false);
+        setAddMenuOpen(false);
     };
 
-    const handleExportOption = (exportType) => {
-        if (exportType === 'alphabetical') {
-            exportToPDF();
-        } else if (exportType === 'grouped') {
-            exportToPDFGroupedByTables();
+    const handleAddOption = (addType) => {
+        if (addType === 'guests') {
+            openAddGuestsModal();
+        } else if (addType === 'group') {
+            openNewGroupModal();
         }
-        setExportMenuOpen(false);
+        setAddMenuOpen(false);
     };
 
     const exportToJSON = () => {
@@ -580,18 +594,18 @@ const saveArrangement = async () => {
 
     // Clear all guests from a specific table
     const handleClearTable = (tableIndex) => {
+        // First, get the guests from the table that need to be moved
+        const guestsToMove = tables[tableIndex];
+        
+        // Clear the table
         setTables(prevTables => {
             const updatedTables = [...prevTables];
-            const guestsToMove = updatedTables[tableIndex];
-            
-            // Clear the table
             updatedTables[tableIndex] = [];
-            
-            // Add all guests back to guest list
-            setGuestList(prevGuestList => [...prevGuestList, ...guestsToMove]);
-            
             return updatedTables;
         });
+        
+        // Then add all guests back to guest list
+        setGuestList(prevGuestList => [...prevGuestList, ...guestsToMove]);
     };
 
     /*const handleReassign = (guest, fromTableIndex, toTableIndex) => {
@@ -651,9 +665,16 @@ const saveArrangement = async () => {
         setContextMenu({ visible: false, x: 0, y: 0 }); // Hide context menu
     };
 
-    const handleContextMenu = (e) => {
-        if (selectedGuests.size > 1) {
-            e.preventDefault();
+    const handleContextMenu = (e, guestId = null) => {
+        e.preventDefault();
+        
+        // If a specific guest was right-clicked and it's not selected, select it
+        if (guestId && !selectedGuests.has(guestId)) {
+            setSelectedGuests(new Set([guestId]));
+        }
+        
+        // Show context menu if at least one guest is selected (or will be selected)
+        if (selectedGuests.size >= 1 || guestId) {
             setContextMenu({
                 visible: true,
                 x: e.clientX,
@@ -1389,7 +1410,7 @@ const saveArrangement = async () => {
                                             e.dataTransfer.setData('guest', JSON.stringify(guest));
                                         }
                                     }}
-                                    onContextMenu={handleContextMenu}
+                                    onContextMenu={(e) => handleContextMenu(e, guest.id)}
                                     className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                                     style={{
                                         backgroundColor: matchesSearch(guest) ? '#e3f2fd' : 'transparent',
@@ -1486,7 +1507,7 @@ const saveArrangement = async () => {
                                     e.dataTransfer.setData('guest', JSON.stringify(guest));
                                 }
                             }}
-                            onContextMenu={handleContextMenu}
+                            onContextMenu={(e) => handleContextMenu(e, guest.id)}
                             className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                             style={{
                                 backgroundColor: matchesSearch(guest) ? '#e3f2fd' : 'transparent',
@@ -1550,7 +1571,16 @@ const saveArrangement = async () => {
     };
 
     return (
-        <div style={{ display: 'flex' }} onClick={hideContextMenu}>
+        <div>
+            {/* Top Action Bar */}
+            <TopActionBar 
+                onSave={saveArrangement}
+                onExportAlphabetical={exportToPDF}
+                onExportGrouped={exportToPDFGroupedByTables}
+                onExportTickets={exportGuestTicketsToPDF}
+            />
+            
+            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}
             <ConfigurationModal 
                 onExportToJSON={exportToJSON}
@@ -1901,57 +1931,24 @@ const saveArrangement = async () => {
                     {/* Action Buttons */}
                     <div className="button-section">
                         <div className="button-row">
-                            <Button
-                                variant="contained"
-                                color="success"
-                                onClick={openAddGuestsModal}
-                                className='add-guests-button'
-                                size="small"
-                            >
-                                ➕ Add Guests
-                            </Button>
-                        </div>
-                        <div className="button-row">
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={saveArrangement}
-                                className='save-button'
-                                size="small"
-                            >
-                                Save Arrangement
-                            </Button>
-                        </div>
-                        
-                        <div className="button-row">
                             <ButtonGroup 
                                 variant="contained" 
                                 color="success"
-                                ref={exportAnchorRef}
-                                aria-label="PDF export options"
+                                ref={addAnchorRef}
+                                aria-label="Add options"
                                 size="small"
                             >
                                 <Button 
-                                    onClick={() => handleExportOption('alphabetical')}
-                                    className='export-button'
+                                    onClick={handleAddMenuToggle}
+                                    className='add-guests-button'
                                 >
-                                    Export as PDF
-                                </Button>
-                                <Button
-                                    size="small"
-                                    aria-controls={exportMenuOpen ? 'export-split-button-menu' : undefined}
-                                    aria-expanded={exportMenuOpen ? 'true' : undefined}
-                                    aria-label="select export option"
-                                    aria-haspopup="menu"
-                                    onClick={handleExportMenuToggle}
-                                >
-                                    <ArrowDropDownIcon />
+                                    ➕
                                 </Button>
                             </ButtonGroup>
                             <Popper
                                 sx={{ zIndex: 1 }}
-                                open={exportMenuOpen}
-                                anchorEl={exportAnchorRef.current}
+                                open={addMenuOpen}
+                                anchorEl={addAnchorRef.current}
                                 role={undefined}
                                 transition
                                 disablePortal
@@ -1962,16 +1959,17 @@ const saveArrangement = async () => {
                                         style={{
                                             transformOrigin:
                                                 placement === 'bottom' ? 'center top' : 'center bottom',
+                                            
                                         }}
                                     >
                                         <Paper>
-                                            <ClickAwayListener onClickAway={handleExportMenuClose}>
-                                                <MenuList id="export-split-button-menu" autoFocusItem>
-                                                    <MenuItem onClick={() => handleExportOption('alphabetical')}>
-                                                        Alphabetical List
+                                            <ClickAwayListener onClickAway={handleAddMenuClose}>
+                                                <MenuList id="add-split-button-menu" autoFocusItem>
+                                                    <MenuItem onClick={() => handleAddOption('guests')}>
+                                                        Add Guests
                                                     </MenuItem>
-                                                    <MenuItem onClick={() => handleExportOption('grouped')}>
-                                                        Grouped by Tables
+                                                    <MenuItem onClick={() => handleAddOption('group')}>
+                                                        Add Group
                                                     </MenuItem>
                                                 </MenuList>
                                             </ClickAwayListener>
@@ -1979,15 +1977,9 @@ const saveArrangement = async () => {
                                     </Grow>
                                 )}
                             </Popper>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={exportGuestTicketsToPDF}
-                                className='export-button'
-                                size="small"
-                            >
-                                📋 Export ticket Information
-                            </Button>
+                        </div>
+                        
+                        <div className="button-row">
                             <Button
                                 variant="contained"
                                 color="info"
@@ -1995,7 +1987,7 @@ const saveArrangement = async () => {
                                 className='switch-button'
                                 size="small"
                             >
-                                Change view mode
+                                {viewMode === 'visual' ? <ListAltIcon /> : <TableBarIcon />}
                             </Button>
                             <Button
                                 variant="contained"
@@ -2004,7 +1996,7 @@ const saveArrangement = async () => {
                                 className='delete-button'
                                 size="small"
                             >
-                                Remove Selected Guests
+                                <DeleteIcon />
                             </Button>
                         </div>
                     </div>
@@ -2065,8 +2057,8 @@ const saveArrangement = async () => {
                     </div>
                     
                     {/* Statistics */}
-                    <p className="guest-list-stats">Total Guests: {guestList.length}</p>
-                    
+                    <p className="guest-list-stats">Remaining Guests: {guestList.length}</p>
+
                     {/* Selected guests info */}
                     {selectedGuests.size > 1 && (
                         <div style={{ 
@@ -2102,6 +2094,7 @@ const saveArrangement = async () => {
                 </div>
             </div>
             {viewMode === 'list' ? renderListView() : renderVisualView()}
+            </div>
         </div>
     );
 }

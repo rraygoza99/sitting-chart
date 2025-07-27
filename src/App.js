@@ -11,10 +11,6 @@ function App() {
   return (
     <BrowserRouter>
       <div className="App">
-        <header className="App-header">
-          <h1 onClick={redirectToHome} style={{cursor: 'pointer'}} >Wedding Seating Arrangement</h1>
-        </header>
-
         <Routes>
           <Route path="/" element={<EditableList />} />
 
