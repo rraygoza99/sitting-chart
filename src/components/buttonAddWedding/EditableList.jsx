@@ -150,20 +150,92 @@ function EditableList() {
                     
                     console.log('Parsed rows:', rows);
                     
-                    const guests = rows.map((row, index) => {
+                    // Calculate starting ID (since this is a new wedding, start from 1)
+                    let nextId = 1;
+                    
+                    // First pass: Create a map to identify original guests and their +1, +2, etc.
+                    const guestMap = new Map();
+                    const plusOneGuests = [];
+                    
+                    rows.forEach((row, index) => {
                         const firstName = row[0] ? row[0].trim() : '';
                         const lastName = row[1] ? row[1].trim() : '';
                         const group = row[2] ? row[2].trim() : 'Ungrouped';
-                        const id = row[3] ? row[3].trim() : `csv-guest-${Date.now()}-${index}`;
+                        // ID is now optional - if provided use it, otherwise generate it
+                        const providedId = row[3] ? row[3].trim() : null;
                         
-                        return {
-                            firstName,
-                            lastName,
-                            group,
-                            id
-                        };
-                    }).filter(guest => guest.firstName && guest.lastName);
+                        // Check if this is a +1, +2, +3, etc. guest
+                        const plusOneMatch = lastName.match(/^(.+?)\s+\+(\d+)$/);
+                        
+                        if (plusOneMatch) {
+                            // This is a +1, +2, +3, etc. guest
+                            const originalLastName = plusOneMatch[1];
+                            const plusNumber = parseInt(plusOneMatch[2], 10);
+                            
+                            // Find the original guest by matching firstName and originalLastName
+                            const originalGuestKey = `${firstName}-${originalLastName}`;
+                            
+                            plusOneGuests.push({
+                                firstName,
+                                lastName,
+                                group,
+                                providedId,
+                                originalGuestKey,
+                                plusNumber,
+                                originalLastName
+                            });
+                        } else {
+                            // This is an original guest
+                            const guestKey = `${firstName}-${lastName}`;
+                            const guestId = providedId || nextId++;
+                            
+                            guestMap.set(guestKey, {
+                                firstName,
+                                lastName,
+                                group,
+                                id: guestId
+                            });
+                        }
+                    });
                     
+                    // Second pass: Process +1 guests and link them to original guests
+                    const processedGuests = Array.from(guestMap.values());
+                    
+                    plusOneGuests.forEach(plusOneGuest => {
+                        const originalGuest = guestMap.get(plusOneGuest.originalGuestKey);
+                        
+                        if (originalGuest) {
+                            // Link this +1 guest to the original guest
+                            const plusOneId = plusOneGuest.providedId || `${originalGuest.id}-${plusOneGuest.plusNumber}`;
+                            
+                            processedGuests.push({
+                                firstName: plusOneGuest.firstName,
+                                lastName: plusOneGuest.lastName,
+                                group: plusOneGuest.group,
+                                originalGuestId: originalGuest.id,
+                                id: plusOneId
+                            });
+                        } else {
+                            // Original guest not found, treat as standalone guest
+                            console.warn(`Original guest not found for +${plusOneGuest.plusNumber} guest:`, plusOneGuest);
+                            const standaloneId = plusOneGuest.providedId || nextId++;
+                            
+                            processedGuests.push({
+                                firstName: plusOneGuest.firstName,
+                                lastName: plusOneGuest.lastName,
+                                group: plusOneGuest.group,
+                                id: standaloneId
+                            });
+                        }
+                    });
+                    
+                    const guests = processedGuests.filter(guest => guest.firstName && guest.lastName);
+                    
+                    // Count original guests vs +1 guests for better feedback
+                    const originalGuests = guests.filter(guest => !guest.originalGuestId);
+                    const additionalGuests = guests.filter(guest => guest.originalGuestId);
+                    
+                    console.log(`Import summary: ${originalGuests.length} original guests, ${additionalGuests.length} additional guests (+1, +2, etc.)`);
                     console.log('Processed guests:', guests);
                     resolve(guests);
                 } catch (error) {
@@ -196,7 +268,7 @@ function EditableList() {
             const guests = await processCsvFile(csvFile);
             
             if (guests.length === 0) {
-                alert('No valid guests found in CSV. Please check the format:\nfirstName,lastName,group,id');
+                alert('No valid guests found in CSV. Please check the format:\nfirstName,lastName,group (ID is optional)');
                 return;
             }
             
@@ -224,7 +296,18 @@ function EditableList() {
             };
             localStorage.setItem(storageKey, JSON.stringify(arrangementData));
             
-            alert(`Wedding "${trimmedName}" created with ${guests.length} guests imported successfully!`);
+            // Count original guests vs +1 guests for better feedback
+            const originalGuests = guests.filter(guest => !guest.originalGuestId);
+            const additionalGuests = guests.filter(guest => guest.originalGuestId);
+            
+            let successMessage = `Wedding "${trimmedName}" created successfully!\n`;
+            successMessage += `Imported: ${originalGuests.length} original guests`;
+            if (additionalGuests.length > 0) {
+                successMessage += `, ${additionalGuests.length} additional guests (+1, +2, etc.)`;
+            }
+            successMessage += `\nTotal: ${guests.length} guests`;
+            
+            alert(successMessage);
             
             // Reset modal state
             setCsvModalOpen(false);
@@ -302,7 +385,7 @@ function EditableList() {
                 <p>1. Add a wedding name without spaces.</p>
                 <p>2. Click "Open" to start arranging guests.</p>
                 <p>3. Add guest with "Add Guests" button.</p>
-                <p>4. Or import the guest via CSV file, you can find an example clicking in the <SettingsIcon style={{ fontSize: '16px', verticalAlign: 'middle', color: '#666' }} /> button.</p>
+                <p>4. Or import guests via CSV file (Format: firstName,lastName,group).</p>
                 <p>5. Share the arrangement exporting it to JSON file, you can find it in the <SettingsIcon style={{ fontSize: '16px', verticalAlign: 'middle', color: '#666' }} /> button.</p>
                 <br></br>
                 <p>If you already have a JSON file, just click in the "Import JSON file" button!</p>

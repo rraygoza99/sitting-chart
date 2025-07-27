@@ -3,9 +3,6 @@ import EditableList from './components/buttonAddWedding/EditableList';
 import './App.css';
 import SeatingCanvas from './components/SeatingCanvas';
 
-const redirectToHome = () => {
-        window.location.href = '/';
-    }
 function App() {
     
   return (
@@ -20,7 +17,5 @@ function App() {
     </BrowserRouter>
   );
 }
-
-
 
 export default App;

@@ -25,6 +25,8 @@ import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import ConfigurationModal from './ConfigurationModal';
 import TopActionBar from './TopActionBar';
+import ContextMenu from './ContextMenu';
+import TableList from './TableList';
 import './SeatingCanvas.css';
 
 function SeatingCanvas({ guests = [] }) {
@@ -43,7 +45,6 @@ function SeatingCanvas({ guests = [] }) {
     const [editLastName, setEditLastName] = useState('');
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
     const [isDragOverGuestList, setIsDragOverGuestList] = useState(false);
-    const [showGroupSubmenu, setShowGroupSubmenu] = useState(false);
     const [showNewGroupModal, setShowNewGroupModal] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [editingTable, setEditingTable] = useState(null);
@@ -463,16 +464,20 @@ const saveArrangement = async () => {
     };
 
     const downloadSampleCSV = () => {
-        // Create sample CSV data with the expected format: Firstname,Lastname,Group,ID
+        // Create sample CSV data with the expected format: Firstname,Lastname,Group (ID is optional)
         const sampleData = [
-            'John,Doe,Family,1',
-            'Jane,Doe,Family,2',
-            'Mike,Smith,Friends,3',
-            'Sarah,Johnson,Friends,4',
-            'Robert,Williams,Colleagues,5',
-            'Emily,Brown,Colleagues,6',
-            'David,Jones,Family,7',
-            'Lisa,Garcia,Friends,8'
+            'John,Doe,Family',
+            'John,Doe +1,Family',
+            'Jane,Smith,Family',
+            'Jane,Smith +1,Family',
+            'Jane,Smith +2,Family',
+            'Mike,Johnson,Friends',
+            'Sarah,Williams,Friends',
+            'Sarah,Williams +1,Friends',
+            'Robert,Brown,Colleagues',
+            'Emily,Garcia,Colleagues',
+            'David,Jones,Family',
+            'Lisa,Davis,Friends'
         ];
 
         const csvContent = sampleData.join('\n');
@@ -481,7 +486,7 @@ const saveArrangement = async () => {
         const url = URL.createObjectURL(dataBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'sample_guest_list.csv';
+        link.download = 'sample_guest_list_no_ids.csv';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -685,7 +690,6 @@ const saveArrangement = async () => {
 
     const hideContextMenu = () => {
         setContextMenu({ visible: false, x: 0, y: 0 });
-        setShowGroupSubmenu(false);
     };
 
     const getUniqueGroups = () => {
@@ -967,335 +971,9 @@ const saveArrangement = async () => {
         closeAddGuestsModal();
     };
 
-    const renderListView = () => {
-        return (
-            <div
-                className='tables-container'
-            >
-                {tables.map((table, tableIndex) => (
-                    <div
-                        key={tableIndex}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                            const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                            handleDrop(guest, tableIndex);
-                        }}
-                        className='single-table'
-                    >
-                        <div className="table-header"
-                        style={{
-                            ...(table.length === getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-completed-color)', color:'var(--table-header-completed-text-color)' } : {}),
-                            ...(table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-oversized-color)', color:'var(--table-header-oversized-text-color)' } : {}),
-                            ...(tableHasMatchingGuest(table) ? { 
-                                backgroundColor: 'var(--table-header-highlight-color, #c4ce40ff)', 
-                                border: '2px solid #1976d2',
-                                boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
-                            } : {})
-                        }}>
-                            {editingTable === tableIndex ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <TextField
-                                            type='text'
-                                            label="Table Alias"
-                                            size="small"
-                                            defaultValue={getTableDisplayName(tableIndex)}
-                                            style={{ flex: 1, backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableAliasChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                        />
-                                        <TextField
-                                            type='number'
-                                            min="1"
-                                            label="Table #"
-                                            size="small"
-                                            defaultValue={getTableDisplayNumber(tableIndex)}
-                                            style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableNumberChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <TextField
-                                            type='number'
-                                            min="1"
-                                            label="Max Size"
-                                            size="small"
-                                            defaultValue={getTableDisplaySize(tableIndex)}
-                                            style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableSizeChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                        />
-                                        <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold' }}>
-                                            Current: {table.length} guests
-                                        </span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
-                                            {getTableDisplayName(tableIndex)}
-                                        </span>
-                                        <span style={{ fontSize: '14px' }}>
-                                            Table #{getTableDisplayNumber(tableIndex)}
-                                        </span>
-                                    </div>
-                                    <div style={{ fontSize: '14px' }}>
-                                        Seated: {table.length}/{getTableDisplaySize(tableIndex)}
-                                    </div>
-                                </div>
-                            )}
-                            <div style={{ display: 'flex', gap: '5px' }}>
-                                <IconButton
-                                    onClick={() => handleTableEditClick(tableIndex)}
-                                    color="inherit"
-                                    size="small"
-                                    title="Edit table settings"
-                                    sx={{ color: 'white' }}
-                                >
-                                    <Icon>edit</Icon>
-                                </IconButton>
-                                {table.length > 0 && (
-                                    <IconButton
-                                        onClick={() => handleClearTable(tableIndex)}
-                                        color="inherit"
-                                        size="small"
-                                        title="Clear all guests from this table"
-                                        sx={{ color: 'white' }}
-                                    >
-                                        <Icon>delete</Icon>
-                                    </IconButton>
-                                )}
-                            </div>
-                        </div>
-                        <div className="table-content">
-                            {table.map((guest) => (
-                                <div
-                                    key={guest.id}
-                                    draggable
-                                    onDragStart={(e) => {
-                                        e.dataTransfer.setData(
-                                            'guest',
-                                            JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
-                                        );
-                                    }}
-                                    className='table-guest-item'
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                                        <span style={{ flex: 1 }}>
-                                            {highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}
-                                        </span>
-                                    </div>
-                                    <div style={{ marginLeft: '10px', display: 'flex', gap: '5px' }}>
-                                        <IconButton
-                                            onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
-                                            color="primary"
-                                            size="small"
-                                            title="Edit guest name"
-                                        >
-                                            <Icon>edit</Icon>
-                                        </IconButton>
-                                        <IconButton
-                                            onClick={() => handleRemove(guest, tableIndex)}
-                                            color="error"
-                                            size="small"
-                                            title="Remove from table"
-                                        >
-                                            <CloseIcon />
-                                        </IconButton>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    };
 
-    const renderVisualView = () => {
-        return (
-            <div
-                className='visual-tables-container'
-            >
-                {tables.map((table, tableIndex) => (
-                    <div
-                        key={tableIndex}
-                        onDragOver={(e) => e.preventDefault()}                    onDrop={(e) => {
-                            const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                            handleDrop(guest, tableIndex);
-                        }}
-                        className='visual-table-border'
-                    >
-                        <div
-                            className='visual-table-title'
-                            style={{
-                                ...(tableHasMatchingGuest(table) ? { 
-                                    backgroundColor: '#e3f2fd', 
-                                    border: '2px solid #1976d2',
-                                    boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
-                                } : {})
-                            }}
-                        >
-                            {editingTable === tableIndex ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '160px' }}>
-                                    {/* First Row: Table Alias and Number */}
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                        <input
-                                            type="text"
-                                            defaultValue={getTableDisplayName(tableIndex)}
-                                            placeholder="Table name..."
-                                            
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableAliasChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                            autoFocus
-                                            style={{
-                                                background: 'white',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                padding: '2px 4px',
-                                                fontSize: '11px',
-                                                flex: 1
-                                            }}
-                                        />
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            defaultValue={getTableDisplayNumber(tableIndex)}
-                                            
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableNumberChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                            style={{
-                                                background: 'white',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                padding: '2px 4px',
-                                                fontSize: '11px',
-                                                width: '40px'
-                                            }}
-                                        />
-                                    </div>
-                                    {/* Second Row: Max Size */}
-                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '10px', color: '#333' }}>Max:</span>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            defaultValue={getTableDisplaySize(tableIndex)}
-                                            
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableSizeChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                            style={{
-                                                background: 'white',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                padding: '2px 4px',
-                                                fontSize: '11px',
-                                                width: '40px'
-                                            }}
-                                        />
-                                        <span style={{ fontSize: '10px', color: '#333' }}>
-                                            Current: {table.length}
-                                        </span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, textAlign: 'center' }}>
-                                    {/* First Row: Table Name and Number */}
-                                    <div style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                                        {getTableDisplayName(tableIndex)} #{getTableDisplayNumber(tableIndex)}
-                                    </div>
-                                    {/* Second Row: Occupancy */}
-                                    <div style={{ fontSize: '11px' }}>
-                                        {table.length}/{getTableDisplaySize(tableIndex)}
-                                    </div>
-                                </div>
-                            )}
-                            <div style={{ display: 'flex', gap: '2px' }}>
-                                <IconButton
-                                    onClick={() => handleTableEditClick(tableIndex)}
-                                    color="primary"
-                                    size="small"
-                                    title="Edit table settings"
-                                    sx={{ minWidth: '24px', minHeight: '24px', padding: '2px' }}
-                                >
-                                    <Icon sx={{ fontSize: '16px' }}>edit</Icon>
-                                </IconButton>
-                                {table.length > 0 && (
-                                    <IconButton
-                                        onClick={() => handleClearTable(tableIndex)}
-                                        color="error"
-                                        size="small"
-                                        title="Clear all guests from this table"
-                                        sx={{ minWidth: '24px', minHeight: '24px', padding: '2px' }}
-                                    >
-                                        <Icon sx={{ fontSize: '16px' }}>delete</Icon>
-                                    </IconButton>
-                                )}
-                            </div>
-                        </div>
-                    {table.map((guest, index) => {
-                        const currentTableSize = getTableDisplaySize(tableIndex);
-                        const angle = (index / currentTableSize) * 2 * Math.PI; // Divide the circle into equal parts based on table size
-                        const radius = 120; // Distance from the center
-                        const x = 150 + radius * Math.cos(angle)-30; // Calculate x position
-                        const y = 150 + radius * Math.sin(angle)-30; // Calculate y position
-                        return (
-                            <div
-                                key={guest.id}
-                                draggable
-                                onDragStart={(e) => {
-                                    e.dataTransfer.setData(
-                                        'guest',
-                                        JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
-                                    );
-                                }}
-                                onDoubleClick={() => {
-                                    // Double-click to edit any guest
-                                    openEditModal(guest.id, guest.firstName, guest.lastName);
-                                }}
-                                className='visual-table-guest-item'
-                                style={{
-                                    position: 'absolute',
-                                    top: `${y}px`,
-                                    left: `${x}px`,
-                                    
-                                }}
-                            >
-                                <span>{highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            ))}
-        </div>
-    );
-};
+
+
 
     const renderGuestList = () => {
         if (isGrouped) {
@@ -1588,118 +1266,22 @@ const saveArrangement = async () => {
                 onCSVImport={handleCSVImport}
                 onDownloadSampleCSV={downloadSampleCSV}
                 weddingId={weddingId}
+                existingGuests={guestList}
+                existingTables={tables}
             />
             
             {/* Context Menu */}
-            {contextMenu.visible && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: contextMenu.y,
-                        left: contextMenu.x,
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-                        zIndex: 1000,
-                        minWidth: '150px'
-                    }}
-                >
-                    <div
-                        style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            borderBottom: '1px solid #eee'
-                        }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            removeSelectedGuests();
-                        }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                    >
-                        Delete Selected Guests ({selectedGuests.size})
-                    </div>
-                    <div
-                        style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            position: 'relative'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#f5f5f5';
-                            setShowGroupSubmenu(true);
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = 'white';
-                            // Don't hide submenu immediately to allow navigation
-                        }}
-                    >
-                        Change Group... ({selectedGuests.size})
-                        <span style={{ float: 'right' }}>▶</span>
-                        
-                        {/* Group Submenu */}
-                        {showGroupSubmenu && (
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: contextMenu.y + 60 > window.innerHeight - 200 ? 'auto' : 0,
-                                    bottom: contextMenu.y + 60 > window.innerHeight - 200 ? 0 : 'auto',
-                                    left: '100%',
-                                    backgroundColor: 'white',
-                                    border: '1px solid #ccc',
-                                    borderRadius: '4px',
-                                    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-                                    minWidth: '120px',
-                                    maxHeight: '200px',
-                                    overflowY: 'auto',
-                                    zIndex: 1001
-                                }}
-                                onMouseEnter={() => setShowGroupSubmenu(true)}
-                                onMouseLeave={() => setShowGroupSubmenu(false)}
-                            >
-                                {getUniqueGroups().map((group, index) => (
-                                    <div
-                                        key={group}
-                                        style={{
-                                            padding: '8px 12px',
-                                            cursor: 'pointer',
-                                            borderBottom: index < getUniqueGroups().length - 1 ? '1px solid #eee' : 'none'
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            changeGuestGroup(group);
-                                        }}
-                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                                        onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                                    >
-                                        {group}
-                                    </div>
-                                ))}
-                                {getUniqueGroups().length > 0 && (
-                                    <div style={{ borderTop: '1px solid #ddd', margin: '4px 0' }} />
-                                )}
-                                <div
-                                    style={{
-                                        padding: '8px 12px',
-                                        cursor: 'pointer',
-                                        fontStyle: 'italic',
-                                        color: '#666'
-                                    }}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        openNewGroupModal();
-                                    }}
-                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                                >
-                                    Add new group...
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+            <ContextMenu
+                visible={contextMenu.visible}
+                x={contextMenu.x}
+                y={contextMenu.y}
+                selectedGuestsSize={selectedGuests.size}
+                uniqueGroups={getUniqueGroups()}
+                onDeleteGuests={removeSelectedGuests}
+                onChangeGroup={changeGuestGroup}
+                onOpenNewGroupModal={openNewGroupModal}
+                onHide={hideContextMenu}
+            />
             {/* New Group Modal */}
             <Modal
                 open={showNewGroupModal}
@@ -2093,7 +1675,25 @@ const saveArrangement = async () => {
                     {renderGuestList()}
                 </div>
             </div>
-            {viewMode === 'list' ? renderListView() : renderVisualView()}
+            <TableList
+                viewMode={viewMode}
+                tables={tables}
+                editingTable={editingTable}
+                highlightSearchTerm={highlightSearchTerm}
+                handleDrop={handleDrop}
+                tableHasMatchingGuest={tableHasMatchingGuest}
+                getTableDisplayName={getTableDisplayName}
+                getTableDisplayNumber={getTableDisplayNumber}
+                getTableDisplaySize={getTableDisplaySize}
+                handleTableEditClick={handleTableEditClick}
+                handleTableEditComplete={handleTableEditComplete}
+                handleTableAliasChange={handleTableAliasChange}
+                handleTableNumberChange={handleTableNumberChange}
+                handleTableSizeChange={handleTableSizeChange}
+                handleClearTable={handleClearTable}
+                openEditModal={openEditModal}
+                handleRemove={handleRemove}
+            />
             </div>
         </div>
     );

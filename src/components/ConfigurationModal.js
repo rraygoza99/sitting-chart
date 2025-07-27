@@ -14,7 +14,9 @@ const ConfigurationModal = ({
     onDeleteArrangement, 
     onCSVImport,
     onDownloadSampleCSV,
-    weddingId 
+    weddingId,
+    existingGuests = [],
+    existingTables = []
 }) => {
     const [open, setOpen] = useState(false);
     const [defaultTableSize, setDefaultTableSize] = useState(10);
@@ -142,7 +144,11 @@ const ConfigurationModal = ({
                             CSV Import
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <CSVImporter onImport={onCSVImport} />
+                            <CSVImporter 
+                                onImport={onCSVImport} 
+                                existingGuests={existingGuests}
+                                existingTables={existingTables}
+                            />
                             <Button
                                 variant="outlined"
                                 color="info"
@@ -154,7 +160,7 @@ const ConfigurationModal = ({
                             </Button>
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            Import guests from CSV file or download a sample CSV template
+                            Import guests from CSV file (Format: firstName,lastName,group).
                         </Typography>
                     </Box>
 
