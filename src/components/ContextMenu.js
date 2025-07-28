@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 const ContextMenu = ({
     visible,
@@ -9,9 +10,13 @@ const ContextMenu = ({
     onDeleteGuests,
     onChangeGroup,
     onOpenNewGroupModal,
-    onHide
+    onHide,
+    currentLanguage = 'english' // Add currentLanguage prop
 }) => {
     const [showGroupSubmenu, setShowGroupSubmenu] = useState(false);
+    
+    // Use translation hook
+    const { t } = useSeatingTranslation(currentLanguage);
 
     if (!visible) return null;
 
@@ -43,7 +48,7 @@ const ContextMenu = ({
                 onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
                 onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
             >
-                Delete Selected Guests ({selectedGuestsSize})
+                {t('delete')} {t('selectedGuests')} ({selectedGuestsSize})
             </div>
 
             {/* Change Group Option */}
@@ -62,7 +67,7 @@ const ContextMenu = ({
                     // Don't hide submenu immediately to allow navigation
                 }}
             >
-                Change Group... ({selectedGuestsSize})
+                {t('changeGroup')}... ({selectedGuestsSize})
                 <span style={{ float: 'right' }}>▶</span>
                 
                 {/* Group Submenu */}
@@ -125,7 +130,7 @@ const ContextMenu = ({
                             onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
                             onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
                         >
-                            Add new group...
+                            {t('addNewGroup')}...
                         </div>
                     </div>
                 )}

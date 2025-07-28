@@ -14,6 +14,7 @@ import ClickAwayListener from '@mui/material/ClickAwayListener';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
 import './TopActionBar.css';
+import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 function TopActionBar({ 
     onSave, 
@@ -22,11 +23,15 @@ function TopActionBar({
     onExportGrouped,
     onExportTickets,
     onUndo,
-    canUndo = false
+    canUndo = false,
+    currentLanguage = 'english' // Add currentLanguage prop
 }) {
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     const exportAnchorRef = useRef(null);
     const navigate = useNavigate();
+    
+    // Use translation hook
+    const { t } = useSeatingTranslation(currentLanguage);
 
     const handleHomeClick = () => {
         navigate('/');
@@ -64,7 +69,7 @@ function TopActionBar({
                         onClick={handleHomeClick}
                         className="home-button"
                         size="medium"
-                        title="Go to Home"
+                        title={t('goToHome')}
                         sx={{ 
                             backgroundColor: '#1976d2',
                             color: 'white',
@@ -90,7 +95,7 @@ function TopActionBar({
                             disabled={!canUndo}
                             className="undo-button"
                             size="medium"
-                            title="Undo last table assignment"
+                            title={t('undoLastAction')}
                             sx={{ 
                                 backgroundColor: canUndo ? '#582f5fff' : '#e0e0e0',
                                 color: canUndo ? 'white' : '#9e9e9e',
@@ -114,14 +119,14 @@ function TopActionBar({
                             size="medium"
                             startIcon={<SaveIcon />}
                         >
-                            Save
+                            {t('save')}
                         </Button>
                     </div>
                     <Button 
                         variant="contained" 
                         color="success"
                         ref={exportAnchorRef}
-                        aria-label="PDF export options"
+                        aria-label={t('ariaLabelPDFExport')}
                         aria-controls={exportMenuOpen ? 'export-split-button-menu' : undefined}
                         aria-expanded={exportMenuOpen ? 'true' : undefined}
                         aria-haspopup="menu"
@@ -132,7 +137,7 @@ function TopActionBar({
                         endIcon={<ArrowDropDownIcon />}
                         style={{ marginRight: '8px' }}
                     >
-                        Export
+                        {t('export')}
                     </Button>
                     
                     <Popper
@@ -155,13 +160,13 @@ function TopActionBar({
                                     <ClickAwayListener onClickAway={handleExportMenuClose}>
                                         <MenuList id="export-split-button-menu" autoFocusItem>
                                             <MenuItem onClick={() => handleExportOption('alphabetical')}>
-                                                Alphabetical List
+                                                {t('alphabeticalList')}
                                             </MenuItem>
                                             <MenuItem onClick={() => handleExportOption('grouped')}>
-                                                Grouped by Tables
+                                                {t('groupedByTables')}
                                             </MenuItem>
                                             <MenuItem onClick={() => handleExportOption('tickets')}>
-                                                Export Tickets
+                                                {t('exportTickets')}
                                             </MenuItem>
                                         </MenuList>
                                     </ClickAwayListener>

@@ -5,11 +5,9 @@ import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
-import ExposurePlus1Icon from '@mui/icons-material/Exposure';
 import Icon from '@mui/material/Icon';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
-import DeleteIcon from '@mui/icons-material/Delete';
 import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import TableBarIcon from '@mui/icons-material/TableBar';
@@ -29,6 +27,7 @@ import TopActionBar from './TopActionBar';
 import ContextMenu from './ContextMenu';
 import TableList from './TableList';
 import './SeatingCanvas.css';
+import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 function SeatingCanvas({ guests = [] }) {
     const { name: weddingId } = useParams();
@@ -56,6 +55,7 @@ function SeatingCanvas({ guests = [] }) {
     const [newGuestsData, setNewGuestsData] = useState([]);
     const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed groups
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
+    const [currentLanguage, setCurrentLanguage] = useState('english'); // Language state
     
     // Split button state for Add actions
     const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -64,6 +64,9 @@ function SeatingCanvas({ guests = [] }) {
     const [undoHistory, setUndoHistory] = useState([]);
     const MAX_UNDO_HISTORY = 10;
     const addAnchorRef = useRef(null);
+    
+    // Translation hook
+    const { t } = useSeatingTranslation(currentLanguage);
 
     // Function to get the configured table size
     const getTableSize = useCallback(() => {
@@ -136,6 +139,19 @@ function SeatingCanvas({ guests = [] }) {
             }));
             setGuestList(initialGuestList);
         }
+        
+        // Load language preference
+        const savedConfig = localStorage.getItem('seatingConfiguration');
+        if (savedConfig) {
+            try {
+                const config = JSON.parse(savedConfig);
+                if (config.language) {
+                    setCurrentLanguage(config.language);
+                }
+            } catch (error) {
+                console.error('Error loading language preference:', error);
+            }
+        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -161,7 +177,7 @@ function SeatingCanvas({ guests = [] }) {
 
         updateTables(guestList.length + newGuests.length);
         
-        setAlertMessage(`Successfully imported ${newGuests.length} guests!`);
+        setAlertMessage(t('importSuccessful', { count: newGuests.length }));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -176,7 +192,7 @@ const saveArrangement = async () => {
         };
         localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
         
-        setAlertMessage('Arrangement saved successfully!');
+        setAlertMessage(t('arrangementSaved'));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -201,7 +217,7 @@ const saveArrangement = async () => {
 
     const performUndo = () => {
         if (undoHistory.length === 0) {
-            setAlertMessage('No actions to undo');
+            setAlertMessage(t('noActionsToUndo'));
             setAlertSeverity('info');
             setAlertOpen(true);
             return;
@@ -216,7 +232,7 @@ const saveArrangement = async () => {
         setTableNumbers(lastState.tableNumbers);
         setUndoHistory(remainingHistory);
 
-        setAlertMessage(`Undid: ${lastState.action}`);
+        setAlertMessage(t('undoAction', { action: lastState.action }));
         setAlertSeverity('info');
         setAlertOpen(true);
     };
@@ -232,13 +248,13 @@ const saveArrangement = async () => {
         setTableAliases({}); // Reset table aliases
         setTableSizes({}); // Reset table sizes
         setTableNumbers({}); // Reset table numbers
-        setAlertMessage('Arrangement deleted successfully!');
+        setAlertMessage(t('arrangementDeleted'));
         setAlertSeverity('warning');
         setAlertOpen(true);
     };    const exportToPDF = () => {
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text('Wedding Seating Arrangement', 10, 10);
+        doc.text(t('weddingSeatingArrangement'), 10, 10);
 
         const allGuests = [];
         tables.forEach((table, tableIndex) => {
@@ -263,9 +279,9 @@ const saveArrangement = async () => {
 
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('Last Name', 10, currentY);
-        doc.text('First Name', 10 + columnWidths[0], currentY);
-        doc.text('Table #', 10 + columnWidths[0] + columnWidths[1], currentY);
+        doc.text(t('lastName'), 10, currentY);
+        doc.text(t('firstName'), 10 + columnWidths[0], currentY);
+        doc.text(t('tableNumber'), 10 + columnWidths[0] + columnWidths[1], currentY);
         
         doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
         currentY += 10;
@@ -297,7 +313,7 @@ const saveArrangement = async () => {
     const exportToPDFGroupedByTables = () => {
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text('Wedding Seating Arrangement - Grouped by Tables', 10, 10);
+        doc.text(t('weddingSeatingArrangementGrouped'), 10, 10);
 
         let currentY = 30;
         const pageHeight = 280;
@@ -409,7 +425,7 @@ const saveArrangement = async () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        setAlertMessage('Arrangement exported to JSON successfully!');
+        setAlertMessage(t('arrangementExported'));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -419,12 +435,12 @@ const saveArrangement = async () => {
         
         // Title
         doc.setFontSize(18);
-        doc.text('Guest Ticket List', 20, 20);
+        doc.text(t('guestTicketList'), 20, 20);
         
         // Wedding name if available
         if (weddingId) {
             doc.setFontSize(14);
-            doc.text(`Wedding: ${weddingId}`, 20, 35);
+            doc.text(`${t('wedding')}: ${weddingId}`, 20, 35);
         }
         
         // Date
@@ -505,7 +521,7 @@ const saveArrangement = async () => {
         
         doc.save(`${weddingId || 'wedding'}_guest_tickets.pdf`);
         
-        setAlertMessage('Guest ticket list exported to PDF successfully!');
+        setAlertMessage(t('guestTicketsExported'));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -539,7 +555,7 @@ const saveArrangement = async () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        setAlertMessage('Sample CSV downloaded successfully!');
+        setAlertMessage(t('sampleCSVDownloaded'));
         setAlertSeverity('info');
         setAlertOpen(true);
     };
@@ -1028,6 +1044,13 @@ const saveArrangement = async () => {
         setNewGuestsData([]);
     };
 
+    const handleLanguageChange = (newLanguage) => {
+        setCurrentLanguage(newLanguage);
+        console.log('Language changed to:', newLanguage);
+        // Here you can add additional logic when language changes
+        // such as updating text labels, date formats, etc.
+    };
+
     const handleAddRow = () => {
         const newRow = {
             id: newGuestsData.length + 1,
@@ -1048,7 +1071,7 @@ const saveArrangement = async () => {
         );
         
         if (validGuests.length === 0) {
-            setAlertMessage('Please add at least one guest with first and last name');
+            setAlertMessage(t('pleaseAddGuest'));
             setAlertSeverity('warning');
             setAlertOpen(true);
             return;
@@ -1065,7 +1088,7 @@ const saveArrangement = async () => {
         setGuestList(prevGuestList => [...prevGuestList, ...guestsToAdd]);
         updateTables(guestList.length + guestsToAdd.length);
         
-        setAlertMessage(`Successfully added ${guestsToAdd.length} guest(s)`);
+        setAlertMessage(t('guestAdded', { count: guestsToAdd.length }));
         setAlertSeverity('success');
         setAlertOpen(true);
         
@@ -1101,7 +1124,6 @@ const saveArrangement = async () => {
                 return getGuestOrder(a).localeCompare(getGuestOrder(b));
             });
             }
-            console.log('Grouped Guests:', groupedGuests);
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3 
@@ -1303,7 +1325,7 @@ const saveArrangement = async () => {
                                         isMultiDrag: true,
                                         selectedGuests: selectedGuestsList,
                                         id: 'multi-drag', // Placeholder ID for multi-drag
-                                        firstName: `${selectedGuests.size} guests`,
+                                        firstName: `${selectedGuests.size} ${t('guests')}`,
                                         lastName: ''
                                     }));
                                 } else {
@@ -1337,6 +1359,18 @@ const saveArrangement = async () => {
                                 </Icon>
                             )}
                             <div style={{ display: 'flex', gap: '5px' }}>
+                                
+                                {canAddPlusOne(guest.id) && (
+                                    <Button
+                                                variant="contained"
+                                                color="primary"
+                                                onClick={() => handleAddPlusOne(guest)}
+                                                style={{ marginLeft: '10px' }}
+                                                className='plus-one-button'
+                                            >
+                                                <Icon>exposure_plus_1</Icon>
+                                            </Button>
+                                )}
                                 <IconButton
                                     onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
                                     color="primary"
@@ -1345,16 +1379,6 @@ const saveArrangement = async () => {
                                 >
                                     <Icon>edit</Icon>
                                 </IconButton>
-                                {canAddPlusOne(guest.id) && (
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        onClick={() => handleAddPlusOne(guest)}
-                                        style={{ marginLeft: '10px' }}
-                                    >
-                                        <ExposurePlus1Icon />
-                                    </Button>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -1377,28 +1401,27 @@ const saveArrangement = async () => {
     return (
         <div>
             {/* Top Action Bar */}
-            <TopActionBar 
-                onSave={saveArrangement}
-                onExportAlphabetical={exportToPDF}
-                onExportGrouped={exportToPDFGroupedByTables}
-                onExportTickets={exportGuestTicketsToPDF}
-                onUndo={performUndo}
-                canUndo={undoHistory.length > 0}
-            />
-            
-            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
+                <TopActionBar
+                    onSave={saveArrangement}
+                    onExportAlphabetical={exportToPDF}
+                    onExportGrouped={exportToPDFGroupedByTables}
+                    onExportTickets={exportGuestTicketsToPDF}
+                    onUndo={performUndo}
+                    canUndo={undoHistory.length > 0}
+                    currentLanguage={currentLanguage}
+                />            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}
-            <ConfigurationModal 
-                onExportToJSON={exportToJSON}
-                onDeleteArrangement={deleteArrangement}
-                onCSVImport={handleCSVImport}
-                onDownloadSampleCSV={downloadSampleCSV}
-                weddingId={weddingId}
-                existingGuests={guestList}
-                existingTables={tables}
-            />
-            
-            {/* Context Menu */}
+                    <ConfigurationModal
+                        onExportToJSON={exportToJSON}
+                        onDeleteArrangement={deleteArrangement}
+                        onCSVImport={handleCSVImport}
+                        onDownloadSampleCSV={downloadSampleCSV}
+                        onLanguageChange={handleLanguageChange}
+                        currentLanguage={currentLanguage}
+                        weddingId={weddingId}
+                        existingGuests={guestList}
+                        existingTables={tables}
+                    />            {/* Context Menu */}
             <ContextMenu
                 visible={contextMenu.visible}
                 x={contextMenu.x}
@@ -1409,6 +1432,7 @@ const saveArrangement = async () => {
                 onChangeGroup={changeGuestGroup}
                 onOpenNewGroupModal={openNewGroupModal}
                 onHide={hideContextMenu}
+                currentLanguage={currentLanguage}
             />
             {/* New Group Modal */}
             <Modal
@@ -1474,7 +1498,11 @@ const saveArrangement = async () => {
                     overflow: 'auto'
                 }}>
                     <Typography id="add-guests-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
-                        Add New Guests
+                        {t('addGuests')}
+                    </Typography>
+                    
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
+                        {t('addGuestsInstructions')}
                     </Typography>
                     
                     <div style={{ height: 400, width: '100%', marginBottom: '16px' }}>
@@ -1483,19 +1511,19 @@ const saveArrangement = async () => {
                             columns={[
                                 {
                                     field: 'firstName',
-                                    headerName: 'First Name',
+                                    headerName: t('firstName'),
                                     width: 200,
                                     editable: true,
                                 },
                                 {
                                     field: 'lastName',
-                                    headerName: 'Last Name',
+                                    headerName: t('lastName'),
                                     width: 200,
                                     editable: true,
                                 },
                                 {
                                     field: 'group',
-                                    headerName: 'Group',
+                                    headerName: t('group'),
                                     width: 200,
                                     editable: true,
                                     type: 'singleSelect',
@@ -1503,7 +1531,7 @@ const saveArrangement = async () => {
                                 },
                                 {
                                     field: 'actions',
-                                    headerName: 'Actions',
+                                    headerName: t('actions'),
                                     width: 100,
                                     renderCell: (params) => (
                                         <IconButton
@@ -1548,14 +1576,14 @@ const saveArrangement = async () => {
                             variant="outlined"
                             onClick={closeAddGuestsModal}
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                         <Button
                             variant="contained"
                             onClick={saveNewGuests}
                             color="primary"
                         >
-                            Add Guests
+                            {t('addGuests')}
                         </Button>
                     </Box>
                 </Box>
@@ -1570,11 +1598,11 @@ const saveArrangement = async () => {
             >
                 <Box sx={modalStyle}>
                     <Typography id="edit-guest-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
-                        Edit Guest Information
+                        {t('editGuest')} {t('info')}
                     </Typography>
                     <TextField
                         fullWidth
-                        label="First Name"
+                        label={t('firstName')}
                         value={editFirstName}
                         onChange={(e) => setEditFirstName(e.target.value)}
                         margin="normal"
@@ -1582,7 +1610,7 @@ const saveArrangement = async () => {
                     />
                     <TextField
                         fullWidth
-                        label="Last Name"
+                        label={t('lastName')}
                         value={editLastName}
                         onChange={(e) => setEditLastName(e.target.value)}
                         margin="normal"
@@ -1593,14 +1621,14 @@ const saveArrangement = async () => {
                             variant="outlined"
                             onClick={closeEditModal}
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                         <Button
                             variant="contained"
                             onClick={saveGuestEdit}
                             disabled={!editFirstName.trim()}
                         >
-                            Save
+                            {t('save')}
                         </Button>
                     </Box>
                 </Box>
@@ -1701,7 +1729,7 @@ const saveArrangement = async () => {
                                                             }
                                                         }}
                                                     >
-                                                        Add Guests
+                                                        {t('addGuests')}
                                                     </MenuItem>
                                                     <MenuItem 
                                                         onClick={() => handleAddOption('group')}
@@ -1714,7 +1742,7 @@ const saveArrangement = async () => {
                                                             }
                                                         }}
                                                     >
-                                                        Add Group
+                                                        {t('addGroup')}
                                                     </MenuItem>
                                                 </MenuList>
                                             </ClickAwayListener>
@@ -1755,7 +1783,7 @@ const saveArrangement = async () => {
                                 onChange={(e) => setIsGrouped(e.target.checked)}
                                 style={{ marginRight: '5px' }}
                             />
-                            Group Guests
+                            {t('groupGuests')}
                         </label>
                         
                         {isGrouped && (
@@ -1769,7 +1797,7 @@ const saveArrangement = async () => {
                                     minWidth: 'auto'
                                 }}
                             >
-                                {getUniqueGroups().every(group => collapsedGroups.has(group)) ? 'Expand All' : 'Collapse All'}
+                                {getUniqueGroups().every(group => collapsedGroups.has(group)) ? t('expandAll') : t('collapseAll')}
                             </Button>
                         )}
                     </div>
@@ -1779,7 +1807,7 @@ const saveArrangement = async () => {
                         <TextField
                             fullWidth
                             size="small"
-                            label="Search guests..."
+                            label={t('searchGuests')}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             variant="outlined"
@@ -1802,7 +1830,7 @@ const saveArrangement = async () => {
                     </div>
                     
                     {/* Statistics */}
-                    <p className="guest-list-stats">Remaining Guests: {guestList.length}</p>
+                    <p className="guest-list-stats">{t('remainingGuests')}: {guestList.length}</p>
 
                     {/* Selected guests info */}
                     {selectedGuests.size > 1 && (
@@ -1814,7 +1842,7 @@ const saveArrangement = async () => {
                             fontSize: '14px',
                             color: '#1976d2'
                         }}>
-                            <strong>{selectedGuests.size} guests selected</strong> - Drag any selected guest to move all together
+                            <strong>{selectedGuests.size} {t('guestsSelected')}</strong> - {t('dragToMoveMessage')}
                         </div>
                     )}
                 </div>
@@ -1832,7 +1860,7 @@ const saveArrangement = async () => {
                             color: '#2e7d32',
                             textAlign: 'center'
                         }}>
-                            🔄 Drop here to unassign from table
+                            🔄 {t('dropToUnassign')}
                         </div>
                     )}
                     {renderGuestList()}
