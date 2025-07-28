@@ -1528,7 +1528,7 @@ const saveArrangement = async () => {
                                 </Button>
                             </ButtonGroup>
                             <Popper
-                                sx={{ zIndex: 1 }}
+                                sx={{ zIndex: 1000 }}
                                 open={addMenuOpen}
                                 anchorEl={addAnchorRef.current}
                                 role={undefined}
@@ -1544,13 +1544,48 @@ const saveArrangement = async () => {
                                             
                                         }}
                                     >
-                                        <Paper>
+                                        <Paper 
+                                            sx={{ 
+                                                backgroundColor: 'white',
+                                                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                                                border: '1px solid #e0e0e0',
+                                                opacity: 1
+                                            }}
+                                        >
                                             <ClickAwayListener onClickAway={handleAddMenuClose}>
-                                                <MenuList id="add-split-button-menu" autoFocusItem>
-                                                    <MenuItem onClick={() => handleAddOption('guests')}>
+                                                <MenuList 
+                                                    id="add-split-button-menu" 
+                                                    autoFocusItem
+                                                    sx={{ 
+                                                        backgroundColor: 'white',
+                                                        opacity: 1,
+                                                        minWidth: 120
+                                                    }}
+                                                >
+                                                    <MenuItem 
+                                                        onClick={() => handleAddOption('guests')}
+                                                        sx={{ 
+                                                            backgroundColor: 'white',
+                                                            color: '#333',
+                                                            opacity: 1,
+                                                            '&:hover': {
+                                                                backgroundColor: '#f5f5f5'
+                                                            }
+                                                        }}
+                                                    >
                                                         Add Guests
                                                     </MenuItem>
-                                                    <MenuItem onClick={() => handleAddOption('group')}>
+                                                    <MenuItem 
+                                                        onClick={() => handleAddOption('group')}
+                                                        sx={{ 
+                                                            backgroundColor: 'white',
+                                                            color: '#333',
+                                                            opacity: 1,
+                                                            '&:hover': {
+                                                                backgroundColor: '#f5f5f5'
+                                                            }
+                                                        }}
+                                                    >
                                                         Add Group
                                                     </MenuItem>
                                                 </MenuList>
