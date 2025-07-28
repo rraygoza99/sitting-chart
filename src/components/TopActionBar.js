@@ -92,7 +92,7 @@ function TopActionBar({
                             size="medium"
                             title="Undo last table assignment"
                             sx={{ 
-                                backgroundColor: canUndo ? '#9c27b0' : '#e0e0e0',
+                                backgroundColor: canUndo ? '#582f5fff' : '#e0e0e0',
                                 color: canUndo ? 'white' : '#9e9e9e',
                                 '&:hover': {
                                     backgroundColor: canUndo ? '#7b1fa2' : '#e0e0e0'

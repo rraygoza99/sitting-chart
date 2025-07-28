@@ -10,6 +10,7 @@ import Icon from '@mui/material/Icon';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteIcon from '@mui/icons-material/Delete';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import TableBarIcon from '@mui/icons-material/TableBar';
 import Modal from '@mui/material/Modal';
@@ -732,6 +733,36 @@ const saveArrangement = async () => {
         });
     };
 
+    const handleSelectGroup = (groupName, groupGuests) => {
+        const groupGuestIds = groupGuests.map(guest => guest.id);
+        const allGroupGuestsSelected = groupGuestIds.every(id => selectedGuests.has(id));
+        
+        setSelectedGuests(prevSelected => {
+            const updatedSelected = new Set(prevSelected);
+            
+            if (allGroupGuestsSelected) {
+                // Deselect all guests in this group
+                groupGuestIds.forEach(id => updatedSelected.delete(id));
+            } else {
+                // Select all guests in this group
+                groupGuestIds.forEach(id => updatedSelected.add(id));
+            }
+            
+            return updatedSelected;
+        });
+    };
+
+    const isGroupSelected = (groupGuests) => {
+        const groupGuestIds = groupGuests.map(guest => guest.id);
+        return groupGuestIds.length > 0 && groupGuestIds.every(id => selectedGuests.has(id));
+    };
+
+    const isGroupPartiallySelected = (groupGuests) => {
+        const groupGuestIds = groupGuests.map(guest => guest.id);
+        const selectedCount = groupGuestIds.filter(id => selectedGuests.has(id)).length;
+        return selectedCount > 0 && selectedCount < groupGuestIds.length;
+    };
+
     const removeSelectedGuests = () => {
         setGuestList(prevGuestList =>
             prevGuestList.filter(guest => !selectedGuests.has(guest.id))
@@ -1074,7 +1105,6 @@ const saveArrangement = async () => {
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3 
-                        onClick={() => toggleGroupCollapse(groupName)}
                         style={{ 
                             cursor: 'pointer',
                             display: 'flex',
@@ -1098,16 +1128,42 @@ const saveArrangement = async () => {
                             e.target.style.borderColor = '#e0e0e0';
                         }}
                     >
-                        <span style={{ 
-                            fontSize: '16px', 
-                            fontWeight: 'bold',
-                            color: '#2196f3',
-                            transition: 'transform 0.2s ease',
-                            transform: collapsedGroups.has(groupName) ? 'rotate(0deg)' : 'rotate(90deg)'
-                        }}>
+                        <input
+                            type="checkbox"
+                            checked={isGroupSelected(groupedGuests[groupName])}
+                            ref={checkbox => {
+                                if (checkbox) {
+                                    checkbox.indeterminate = isGroupPartiallySelected(groupedGuests[groupName]);
+                                }
+                            }}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                handleSelectGroup(groupName, groupedGuests[groupName]);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ 
+                                marginRight: '8px',
+                                cursor: 'pointer',
+                                transform: 'scale(1.2)'
+                            }}
+                        />
+                        <span 
+                            onClick={() => toggleGroupCollapse(groupName)}
+                            style={{ 
+                                fontSize: '16px', 
+                                fontWeight: 'bold',
+                                color: '#2196f3',
+                                transition: 'transform 0.2s ease',
+                                transform: collapsedGroups.has(groupName) ? 'rotate(0deg)' : 'rotate(90deg)',
+                                cursor: 'pointer'
+                            }}
+                        >
                             ▶
                         </span>
-                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
+                        <span 
+                            onClick={() => toggleGroupCollapse(groupName)}
+                            style={{ fontSize: '16px', fontWeight: 'bold', color: '#333', cursor: 'pointer' }}
+                        >
                             {groupName}
                         </span>
                         <span style={{ 
@@ -1685,7 +1741,7 @@ const saveArrangement = async () => {
                                 className='delete-button'
                                 size="small"
                             >
-                                <DeleteIcon />
+                                <PersonRemoveIcon />
                             </Button>
                         </div>
                     </div>
