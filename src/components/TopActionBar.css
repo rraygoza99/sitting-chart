@@ -11,34 +11,35 @@
 
 .top-action-bar-content {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    padding: 12px 24px;
+    padding: 12px 0;
     max-width: 100%;
     margin: 0 auto;
-}
-
-.top-action-bar-left,
-.top-action-bar-center,
-.top-action-bar-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    gap: 0;
 }
 
 .top-action-bar-left {
-    flex: 1;
-    justify-content: flex-start;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 400px;
+    max-width: 500px;
+    padding: 0 15px;
+    background-color: #ffffff;
+    border-right: 2px solid #ddd;
 }
 
 .top-action-bar-center {
-    flex: 1;
-    justify-content: center;
+    display: none; /* Not used in the new layout */
 }
 
 .top-action-bar-right {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     flex: 1;
-    justify-content: flex-end;
+    gap: 12px;
+    padding: 0 24px;
 }
 
 .top-action-bar .save-button {
@@ -75,20 +76,27 @@
 /* Responsive design */
 @media (max-width: 768px) {
     .top-action-bar-content {
-        padding: 8px 16px;
         flex-direction: column;
+        padding: 8px 0;
         gap: 8px;
     }
     
-    .top-action-bar-left,
-    .top-action-bar-center,
+    .top-action-bar-left {
+        min-width: 100%;
+        max-width: 100%;
+        border-right: none;
+        border-bottom: 2px solid #ddd;
+        padding: 8px 16px;
+    }
+    
     .top-action-bar-right {
         width: 100%;
         justify-content: center;
+        padding: 8px 16px;
     }
     
     .top-action-bar .save-button {
-        width: 100%;
+        width: auto;
         max-width: 200px;
     }
 }

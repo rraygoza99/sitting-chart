@@ -6,6 +6,7 @@ import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SaveIcon from '@mui/icons-material/Save';
 import HomeIcon from '@mui/icons-material/Home';
+import UndoIcon from '@mui/icons-material/Undo';
 import Popper from '@mui/material/Popper';
 import Grow from '@mui/material/Grow';
 import Paper from '@mui/material/Paper';
@@ -19,7 +20,9 @@ function TopActionBar({
     isDisabled = false, 
     onExportAlphabetical,
     onExportGrouped,
-    onExportTickets
+    onExportTickets,
+    onUndo,
+    canUndo = false
 }) {
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     const exportAnchorRef = useRef(null);
@@ -79,6 +82,41 @@ function TopActionBar({
                 </div>
                 
                 <div className="top-action-bar-right">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <IconButton
+                            variant="contained"
+                            color="secondary"
+                            onClick={onUndo}
+                            disabled={!canUndo}
+                            className="undo-button"
+                            size="medium"
+                            title="Undo last table assignment"
+                            sx={{ 
+                                backgroundColor: canUndo ? '#9c27b0' : '#e0e0e0',
+                                color: canUndo ? 'white' : '#9e9e9e',
+                                '&:hover': {
+                                    backgroundColor: canUndo ? '#7b1fa2' : '#e0e0e0'
+                                },
+                                '&:disabled': {
+                                    backgroundColor: '#e0e0e0',
+                                    color: '#9e9e9e'
+                                }
+                            }}
+                        >
+                            <UndoIcon />
+                        </IconButton>
+                        <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={onSave}
+                            disabled={isDisabled}
+                            className="save-button"
+                            size="medium"
+                            startIcon={<SaveIcon />}
+                        >
+                            Save
+                        </Button>
+                    </div>
                     <Button 
                         variant="contained" 
                         color="success"
@@ -96,17 +134,7 @@ function TopActionBar({
                     >
                         Export
                     </Button>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={onSave}
-                        disabled={isDisabled}
-                        className="save-button"
-                        size="medium"
-                        startIcon={<SaveIcon />}
-                    >
-                        Save
-                    </Button>
+                    
                     <Popper
                         sx={{ zIndex: 1 }}
                         open={exportMenuOpen}

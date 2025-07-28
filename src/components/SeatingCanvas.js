@@ -58,6 +58,10 @@ function SeatingCanvas({ guests = [] }) {
     
     // Split button state for Add actions
     const [addMenuOpen, setAddMenuOpen] = useState(false);
+    
+    // Undo system state
+    const [undoHistory, setUndoHistory] = useState([]);
+    const MAX_UNDO_HISTORY = 10;
     const addAnchorRef = useRef(null);
 
     // Function to get the configured table size
@@ -174,7 +178,49 @@ const saveArrangement = async () => {
         setAlertMessage('Arrangement saved successfully!');
         setAlertSeverity('success');
         setAlertOpen(true);
-    };const deleteArrangement = () => {
+    };
+
+    // Undo system functions
+    const saveStateToHistory = (actionDescription) => {
+        const currentState = {
+            guestList: [...guestList],
+            tables: tables.map(table => [...table]),
+            tableAliases: { ...tableAliases },
+            tableSizes: { ...tableSizes },
+            tableNumbers: { ...tableNumbers },
+            timestamp: Date.now(),
+            action: actionDescription
+        };
+
+        setUndoHistory(prevHistory => {
+            const newHistory = [currentState, ...prevHistory];
+            return newHistory.slice(0, MAX_UNDO_HISTORY);
+        });
+    };
+
+    const performUndo = () => {
+        if (undoHistory.length === 0) {
+            setAlertMessage('No actions to undo');
+            setAlertSeverity('info');
+            setAlertOpen(true);
+            return;
+        }
+
+        const [lastState, ...remainingHistory] = undoHistory;
+        
+        setGuestList(lastState.guestList);
+        setTables(lastState.tables);
+        setTableAliases(lastState.tableAliases);
+        setTableSizes(lastState.tableSizes);
+        setTableNumbers(lastState.tableNumbers);
+        setUndoHistory(remainingHistory);
+
+        setAlertMessage(`Undid: ${lastState.action}`);
+        setAlertSeverity('info');
+        setAlertOpen(true);
+    };
+
+    const deleteArrangement = () => {
         localStorage.removeItem(getStorageKey());
         const initialGuestList = guests.map((guest, index) => ({ ...guest, id: `guest-${index}` }));
         setGuestList(initialGuestList.sort((a, b) => a.firstName.localeCompare(b.firstName)));
@@ -509,6 +555,13 @@ const saveArrangement = async () => {
         const isMultiDrag = guest.isMultiDrag;
         const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
         
+        // Save state before making changes
+        if (isMultiDrag) {
+            saveStateToHistory(`Moved ${guestsToMove.length} guests to table ${tableIndex + 1}`);
+        } else {
+            saveStateToHistory(`Moved ${guest.firstName} ${guest.lastName} to table ${tableIndex + 1}`);
+        }
+        
         setTables(prevTables => {
             const updatedTables = [...prevTables];
             
@@ -553,6 +606,13 @@ const saveArrangement = async () => {
             const isMultiDrag = guest.isMultiDrag;
             const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
             
+            // Save state before making changes
+            if (isMultiDrag) {
+                saveStateToHistory(`Unassigned ${guestsToMove.length} guests from tables`);
+            } else {
+                saveStateToHistory(`Unassigned ${guest.firstName} ${guest.lastName} from table ${fromTableIndex + 1}`);
+            }
+            
             // Remove from tables and add back to guest list
             setTables(prevTables => {
                 const updatedTables = [...prevTables];
@@ -588,6 +648,9 @@ const saveArrangement = async () => {
     };
 
     const handleRemove = (guest, tableIndex) => {
+        // Save state before making changes
+        saveStateToHistory(`Removed ${guest.firstName} ${guest.lastName} from table ${tableIndex + 1}`);
+        
         setTables(prevTables => {
             const updatedTables = [...prevTables];
             updatedTables[tableIndex] = updatedTables[tableIndex].filter(assigned => assigned.id !== guest.id);
@@ -601,6 +664,13 @@ const saveArrangement = async () => {
     const handleClearTable = (tableIndex) => {
         // First, get the guests from the table that need to be moved
         const guestsToMove = tables[tableIndex];
+        
+        if (guestsToMove.length === 0) {
+            return; // Nothing to clear
+        }
+        
+        // Save state before making changes
+        saveStateToHistory(`Cleared all ${guestsToMove.length} guests from table ${tableIndex + 1}`);
         
         // Clear the table
         setTables(prevTables => {
@@ -1256,6 +1326,8 @@ const saveArrangement = async () => {
                 onExportAlphabetical={exportToPDF}
                 onExportGrouped={exportToPDFGroupedByTables}
                 onExportTickets={exportGuestTicketsToPDF}
+                onUndo={performUndo}
+                canUndo={undoHistory.length > 0}
             />
             
             <div style={{ display: 'flex' }} onClick={hideContextMenu}>
@@ -1715,19 +1787,19 @@ const saveArrangement = async () => {
                 tables={tables}
                 editingTable={editingTable}
                 highlightSearchTerm={highlightSearchTerm}
-                handleDrop={handleDrop}
+                onDrop={handleDrop}
                 tableHasMatchingGuest={tableHasMatchingGuest}
                 getTableDisplayName={getTableDisplayName}
                 getTableDisplayNumber={getTableDisplayNumber}
                 getTableDisplaySize={getTableDisplaySize}
-                handleTableEditClick={handleTableEditClick}
-                handleTableEditComplete={handleTableEditComplete}
-                handleTableAliasChange={handleTableAliasChange}
-                handleTableNumberChange={handleTableNumberChange}
-                handleTableSizeChange={handleTableSizeChange}
-                handleClearTable={handleClearTable}
-                openEditModal={openEditModal}
-                handleRemove={handleRemove}
+                onTableEditClick={handleTableEditClick}
+                onTableEditComplete={handleTableEditComplete}
+                onTableAliasChange={handleTableAliasChange}
+                onTableNumberChange={handleTableNumberChange}
+                onTableSizeChange={handleTableSizeChange}
+                onClearTable={handleClearTable}
+                onEditGuest={openEditModal}
+                onRemoveGuest={handleRemove}
             />
             </div>
         </div>
