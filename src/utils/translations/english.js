@@ -59,6 +59,8 @@ export const englishTranslations = {
     'table': 'Table',
     'tableNumber': 'Table #',
     'addNewTable': 'Add New Table',
+    'seated': 'Seated',
+    'current': 'Current',
     'totalGuests': 'Total Guests',
     'selectedGuests': 'Selected Guests',
     'unassignedGuests': 'Unassigned Guests',

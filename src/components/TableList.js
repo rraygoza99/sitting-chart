@@ -101,7 +101,7 @@ const TableList = ({
                                             }}
                                         />
                                         <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold' }}>
-                                            Current: {table.length} guests
+                                            {t('current')}: {table.length} {t('guests')}
                                         </span>
                                     </div>
                                 </div>
@@ -112,11 +112,11 @@ const TableList = ({
                                             {getTableDisplayName(tableIndex)}
                                         </span>
                                         <span style={{ fontSize: '14px' }}>
-                                            Table #{getTableDisplayNumber(tableIndex)}
+                                            {t('table')} #{getTableDisplayNumber(tableIndex)}
                                         </span>
                                     </div>
                                     <div style={{ fontSize: '14px' }}>
-                                        Seated: {table.length}/{getTableDisplaySize(tableIndex)}
+                                        {t('seated')}: {table.length}/{getTableDisplaySize(tableIndex)}
                                     </div>
                                 </div>
                             )}
@@ -307,7 +307,7 @@ const TableList = ({
                                             }}
                                         />
                                         <span style={{ fontSize: '10px', color: '#333' }}>
-                                            Current: {table.length}
+                                            {t('current')}: {table.length}
                                         </span>
                                     </div>
                                 </div>

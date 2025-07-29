@@ -702,6 +702,8 @@ const saveArrangement = async () => {
 
     // Add a new empty table
     const handleAddTable = () => {
+        const defaultTableSize = getTableSize();
+        
         setTables(prevTables => [...prevTables, []]);
         
         // Also update table aliases, sizes, and numbers to match the new table count
@@ -712,7 +714,7 @@ const saveArrangement = async () => {
         
         setTableSizes(prevSizes => ({
             ...prevSizes,
-            [tables.length]: 8 // Default size
+            [tables.length]: defaultTableSize // Use the default table size from configuration
         }));
         
         setTableNumbers(prevNumbers => ({
