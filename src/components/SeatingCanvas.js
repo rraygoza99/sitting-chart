@@ -56,6 +56,7 @@ function SeatingCanvas({ guests = [] }) {
     const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed groups
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
     const [currentLanguage, setCurrentLanguage] = useState('english'); // Language state
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track unsaved changes
     
     // Split button state for Add actions
     const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -192,6 +193,9 @@ const saveArrangement = async () => {
         };
         localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
         
+        // Reset unsaved changes flag after successful save
+        setHasUnsavedChanges(false);
+        
         setAlertMessage(t('arrangementSaved'));
         setAlertSeverity('success');
         setAlertOpen(true);
@@ -213,6 +217,9 @@ const saveArrangement = async () => {
             const newHistory = [currentState, ...prevHistory];
             return newHistory.slice(0, MAX_UNDO_HISTORY);
         });
+        
+        // Mark as having unsaved changes when an action occurs
+        setHasUnsavedChanges(true);
     };
 
     const performUndo = () => {
@@ -231,6 +238,9 @@ const saveArrangement = async () => {
         setTableSizes(lastState.tableSizes);
         setTableNumbers(lastState.tableNumbers);
         setUndoHistory(remainingHistory);
+        
+        // Mark as having unsaved changes when undoing
+        setHasUnsavedChanges(true);
 
         setAlertMessage(t('undoAction', { action: lastState.action }));
         setAlertSeverity('info');
@@ -1433,6 +1443,7 @@ const saveArrangement = async () => {
                     onExportTickets={exportGuestTicketsToPDF}
                     onUndo={performUndo}
                     canUndo={undoHistory.length > 0}
+                    hasUnsavedChanges={hasUnsavedChanges}
                     currentLanguage={currentLanguage}
                 />            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}

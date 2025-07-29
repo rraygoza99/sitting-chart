@@ -41,6 +41,9 @@
     gap: 12px;
     padding: 0 24px;
 }
+.top-action-bar .home-button{
+    background-color: #582f5fff;
+}
 
 .top-action-bar .save-button {
     font-weight: 600;
@@ -49,6 +52,8 @@
     text-transform: none;
     box-shadow: 0 2px 4px rgba(25, 118, 210, 0.3);
     transition: all 0.2s ease;
+    background-color: var(--button-save-color);
+    color: var(--button-save-font-color);
 }
 
 .top-action-bar .save-button:hover {
@@ -59,6 +64,7 @@
 .top-action-bar .save-button:disabled {
     box-shadow: none;
     transform: none;
+    background-color: #e0e0e0;
 }
 
 .top-action-bar .export-button {

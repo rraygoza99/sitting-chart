@@ -27,7 +27,11 @@ export const englishTranslations = {
     'undo': 'Undo',
     
     // Navigation and Actions
+        // Navigation
     'goToHome': 'Go to Home',
+    'unsavedChangesTitle': 'Unsaved Changes',
+    'unsavedChangesMessage': 'You have unsaved changes. Are you sure you want to leave without saving?',
+    'leaveWithoutSaving': 'Leave Without Saving',
     'undoLastAction': 'Undo last table assignment',
     'saveArrangement': 'Save Arrangement',
     'exportToPDF': 'Export to PDF',

@@ -1,7 +1,4 @@
-.save-button{
-    background-color: var(--button-save-color) !important;
-    color: var(--button-save-font-color) !important;
-}
+
 .plus-one-button{
     background-color: var(--button-plus-one-color) !important;
     color: var(--button-plus-one-font-color) !important;

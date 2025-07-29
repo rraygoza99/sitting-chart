@@ -13,6 +13,11 @@ import Paper from '@mui/material/Paper';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
 import './TopActionBar.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
@@ -24,9 +29,11 @@ function TopActionBar({
     onExportTickets,
     onUndo,
     canUndo = false,
+    hasUnsavedChanges = false, // Add prop to track unsaved changes
     currentLanguage = 'english' // Add currentLanguage prop
 }) {
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const exportAnchorRef = useRef(null);
     const navigate = useNavigate();
     
@@ -34,7 +41,20 @@ function TopActionBar({
     const { t } = useSeatingTranslation(currentLanguage);
 
     const handleHomeClick = () => {
+        if (hasUnsavedChanges) {
+            setConfirmDialogOpen(true);
+        } else {
+            navigate('/');
+        }
+    };
+
+    const handleConfirmLeave = () => {
+        setConfirmDialogOpen(false);
         navigate('/');
+    };
+
+    const handleCancelLeave = () => {
+        setConfirmDialogOpen(false);
     };
 
     const handleExportMenuToggle = () => {
@@ -114,7 +134,7 @@ function TopActionBar({
                             variant="contained"
                             color="primary"
                             onClick={onSave}
-                            disabled={isDisabled}
+                            disabled={isDisabled || !hasUnsavedChanges}
                             className="save-button"
                             size="medium"
                             startIcon={<SaveIcon />}
@@ -176,6 +196,31 @@ function TopActionBar({
                     </Popper>
                 </div>
             </div>
+            
+            {/* Confirmation Dialog */}
+            <Dialog
+                open={confirmDialogOpen}
+                onClose={handleCancelLeave}
+                aria-labelledby="unsaved-changes-dialog-title"
+                aria-describedby="unsaved-changes-dialog-description"
+            >
+                <DialogTitle id="unsaved-changes-dialog-title">
+                    {t('unsavedChangesTitle')}
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="unsaved-changes-dialog-description">
+                        {t('unsavedChangesMessage')}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelLeave} color="primary">
+                        {t('cancel')}
+                    </Button>
+                    <Button onClick={handleConfirmLeave} color="error" variant="contained">
+                        {t('leaveWithoutSaving')}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     );
 }

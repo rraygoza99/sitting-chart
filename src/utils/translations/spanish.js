@@ -27,7 +27,11 @@ export const spanishTranslations = {
     'undo': 'Deshacer',
     
     // Navigation and Actions
+        // Navigation
     'goToHome': 'Ir al Inicio',
+    'unsavedChangesTitle': 'Cambios sin Guardar',
+    'unsavedChangesMessage': 'Tienes cambios sin guardar. ¿Estás seguro de que quieres salir sin guardar?',
+    'leaveWithoutSaving': 'Salir sin Guardar',
     'undoLastAction': 'Deshacer última asignación de mesa',
     'saveArrangement': 'Guardar Arreglo',
     'exportToPDF': 'Exportar a PDF',
