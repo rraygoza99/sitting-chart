@@ -3,6 +3,7 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Icon from '@mui/material/Icon';
 import CloseIcon from '@mui/icons-material/Close';
+import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 const TableList = ({
     tables,
@@ -21,12 +22,15 @@ const TableList = ({
     onTableNumberChange,
     onTableSizeChange,
     onEditGuest,
+    onAddTable,
     highlightSearchTerm,
     getTableDisplayName,
     getTableDisplaySize,
     getTableDisplayNumber,
-    tableHasMatchingGuest
+    tableHasMatchingGuest,
+    currentLanguage = 'english'
 }) => {
+    const { t } = useSeatingTranslation(currentLanguage);
     const renderListView = () => {
         return (
             <div className='tables-container'>
@@ -180,6 +184,37 @@ const TableList = ({
                         </div>
                     </div>
                 ))}
+                
+                {/* Add Table Button */}
+                <div 
+                    className='single-table add-table-button'
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: '120px',
+                        border: '2px dashed #ccc',
+                        borderRadius: '8px',
+                        backgroundColor: '#f9f9f9',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        marginTop: '20px'
+                    }}
+                    onClick={onAddTable}
+                    onMouseEnter={(e) => {
+                        e.target.style.borderColor = '#2196f3';
+                        e.target.style.backgroundColor = '#f0f8ff';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.borderColor = '#ccc';
+                        e.target.style.backgroundColor = '#f9f9f9';
+                    }}
+                >
+                    <div style={{ textAlign: 'center', color: '#666' }}>
+                        <Icon style={{ fontSize: '48px', marginBottom: '8px', color: '#2196f3' }}>add_circle</Icon>
+                        <div style={{ fontSize: '16px', fontWeight: 'bold' }}>{t('addNewTable')}</div>
+                    </div>
+                </div>
             </div>
         );
     };
@@ -341,6 +376,38 @@ const TableList = ({
                         })}
                     </div>
                 ))}
+                
+                {/* Add Table Button - Visual View */}
+                <div 
+                    className='visual-table-border add-table-button'
+                    style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '300px',
+                        height: '300px',
+                        border: '2px dashed #ccc',
+                        borderRadius: '50%',
+                        backgroundColor: '#f9f9f9',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                        position: 'relative'
+                    }}
+                    onClick={onAddTable}
+                    onMouseEnter={(e) => {
+                        e.target.style.borderColor = '#2196f3';
+                        e.target.style.backgroundColor = '#f0f8ff';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.target.style.borderColor = '#ccc';
+                        e.target.style.backgroundColor = '#f9f9f9';
+                    }}
+                >
+                    <div style={{ textAlign: 'center', color: '#666' }}>
+                        <Icon style={{ fontSize: '64px', marginBottom: '8px', color: '#2196f3' }}>add_circle</Icon>
+                        <div style={{ fontSize: '18px', fontWeight: 'bold' }}>{t('addNewTable')}</div>
+                    </div>
+                </div>
             </div>
         );
     };

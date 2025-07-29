@@ -700,6 +700,29 @@ const saveArrangement = async () => {
         setGuestList(prevGuestList => [...prevGuestList, ...guestsToMove]);
     };
 
+    // Add a new empty table
+    const handleAddTable = () => {
+        setTables(prevTables => [...prevTables, []]);
+        
+        // Also update table aliases, sizes, and numbers to match the new table count
+        setTableAliases(prevAliases => ({
+            ...prevAliases,
+            [tables.length]: `Table ${tables.length + 1}`
+        }));
+        
+        setTableSizes(prevSizes => ({
+            ...prevSizes,
+            [tables.length]: 8 // Default size
+        }));
+        
+        setTableNumbers(prevNumbers => ({
+            ...prevNumbers,
+            [tables.length]: tables.length + 1
+        }));
+        
+        saveStateToHistory(`Added new table ${tables.length + 1}`);
+    };
+
     /*const handleReassign = (guest, fromTableIndex, toTableIndex) => {
         setTables(prevTables => {
             const updatedTables = [...prevTables];
@@ -1882,8 +1905,10 @@ const saveArrangement = async () => {
                 onTableNumberChange={handleTableNumberChange}
                 onTableSizeChange={handleTableSizeChange}
                 onClearTable={handleClearTable}
+                onAddTable={handleAddTable}
                 onEditGuest={openEditModal}
                 onRemoveGuest={handleRemove}
+                currentLanguage={currentLanguage}
             />
             </div>
         </div>

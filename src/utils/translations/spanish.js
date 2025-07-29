@@ -58,6 +58,7 @@ export const spanishTranslations = {
     'group': 'Grupo',
     'table': 'Mesa',
     'tableNumber': 'Mesa #',
+    'addNewTable': 'Agregar Nueva Mesa',
     'totalGuests': 'Total de Invitados',
     'selectedGuests': 'Invitados Seleccionados',
     'unassignedGuests': 'Invitados Sin Asignar',
