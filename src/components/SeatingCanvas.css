@@ -16,6 +16,11 @@
     color: var(--button-switch-font-color) !important;
 }
 
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
 
 .plus-one-label{
   border: 1px solid var(--border-color);

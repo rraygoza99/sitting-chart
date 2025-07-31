@@ -18,31 +18,167 @@ function EditableList() {
     const [csvModalOpen, setCsvModalOpen] = useState(false);
     const [csvWeddingName, setCsvWeddingName] = useState('');
     const [csvFile, setCsvFile] = useState(null);
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
     
+    // API endpoint for S3 operations
+    const S3_API_BASE = "https://q5c7u5zmzc4l7r4warc6oslx4e0bgoqd.lambda-url.us-east-2.on.aws/api/s3";
+    
+    // Load wedding list from S3
+    const loadWeddingsFromServer = async () => {
+        setLoading(true);
+        try {
+            const response = await fetch(`${S3_API_BASE}/list`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            
+            // Extract wedding names from the file list
+            // API returns array of objects: [{ fileName: "wedding1.json", size: 12345, lastModified: "..." }]
+            const weddingNames = data
+                .filter(fileObj => fileObj.fileName && fileObj.fileName.endsWith('.json'))
+                .map(fileObj => fileObj.fileName.replace('.json', ''));
+            
+            setItems(weddingNames);
+        } catch (error) {
+            console.error('Error loading weddings from server:', error);
+            // Fallback to localStorage if server is unavailable
+            const storedItems = JSON.parse(localStorage.getItem('weddingItems')) || [];
+            setItems(storedItems);
+            alert('Could not connect to server. Using local data.');
+        } finally {
+            setLoading(false);
+        }
+    };
+    
     useEffect(() => {
-        const storedItems = JSON.parse(localStorage.getItem('weddingItems')) || [];
-        setItems(storedItems);
+        loadWeddingsFromServer();
     }, []);
     
-    const handleAddClick = () => {
+    // Save wedding to S3
+    const saveWeddingToServer = async (weddingName, weddingData) => {
+        try {
+            const response = await fetch(`${S3_API_BASE}/upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileName: `${weddingName}.json`,
+                    data: weddingData
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error saving wedding to server:', error);
+            return false;
+        }
+    };
+    
+    // Delete wedding from S3
+    const deleteWeddingFromServer = async (weddingName) => {
+        try {
+            const response = await fetch(`${S3_API_BASE}/delete`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileName: `${weddingName}.json`
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error deleting wedding from server:', error);
+            return false;
+        }
+    };
+    
+    const handleAddClick = async () => {
         const trimmed = inputValue.trim();
         if (trimmed && !trimmed.includes(' ')) {
+            setLoading(true);
+            
             if (editingIndex !== null) {
+                // Handle editing - this would require renaming on the server
+                const oldName = items[editingIndex];
                 const newItems = [...items];
                 newItems[editingIndex] = trimmed;
-                setItems(newItems);
-                localStorage.setItem('weddingItems', JSON.stringify(newItems));
-                setEditingIndex(null);
+                
+                // For editing, we would need to implement a rename operation
+                // For now, let's treat this as creating a new wedding
+                const emptyWeddingData = {
+                    weddingName: trimmed,
+                    exportDate: new Date().toISOString(),
+                    totalGuests: 0,
+                    totalTables: 0,
+                    guestList: [],
+                    tables: [],
+                    tableAliases: {},
+                    tableSizes: {},
+                    tableNumbers: {},
+                    metadata: {
+                        viewMode: "list",
+                        isGrouped: true,
+                        version: "1.0"
+                    }
+                };
+                
+                const success = await saveWeddingToServer(trimmed, emptyWeddingData);
+                if (success) {
+                    setItems(newItems);
+                    // Also update localStorage as backup
+                    localStorage.setItem('weddingItems', JSON.stringify(newItems));
+                    setEditingIndex(null);
+                } else {
+                    alert('Failed to save wedding to server. Please try again.');
+                }
             } else {
                 if (!items.includes(trimmed)) {
-                    const newItems = [...items, trimmed];
-                    setItems(newItems);
-                    localStorage.setItem('weddingItems', JSON.stringify(newItems));
+                    // Create empty wedding data
+                    const emptyWeddingData = {
+                        weddingName: trimmed,
+                        exportDate: new Date().toISOString(),
+                        totalGuests: 0,
+                        totalTables: 0,
+                        guestList: [],
+                        tables: [],
+                        tableAliases: {},
+                        tableSizes: {},
+                        tableNumbers: {},
+                        metadata: {
+                            viewMode: "list",
+                            isGrouped: true,
+                            version: "1.0"
+                        }
+                    };
+                    
+                    const success = await saveWeddingToServer(trimmed, emptyWeddingData);
+                    if (success) {
+                        const newItems = [...items, trimmed];
+                        setItems(newItems);
+                        // Also update localStorage as backup
+                        localStorage.setItem('weddingItems', JSON.stringify(newItems));
+                    } else {
+                        alert('Failed to save wedding to server. Please try again.');
+                    }
                 } else {
                     alert('Wedding name already exists!');
                 }
             }
+            
+            setLoading(false);
             setInputValue('');
         } else {
             alert('Please enter a valid wedding name (no spaces allowed)');
@@ -54,17 +190,27 @@ function EditableList() {
         setEditingIndex(index);
     };
 
-    const handleDeleteClick = (weddingName) => {
+    const handleDeleteClick = async (weddingName) => {
         const isConfirmed = window.confirm(`Are you sure you want to delete "${weddingName}"?`);
         if (!isConfirmed) return;
         
-        const newItems = items.filter(item => item !== weddingName);
-        setItems(newItems);
-        localStorage.setItem('weddingItems', JSON.stringify(newItems));
+        setLoading(true);
         
-        // Remove the wedding arrangement data from localStorage
-        const arrangementKey = `weddingArrangement-${weddingName}`;
-        localStorage.removeItem(arrangementKey);
+        const success = await deleteWeddingFromServer(weddingName);
+        if (success) {
+            const newItems = items.filter(item => item !== weddingName);
+            setItems(newItems);
+            // Also update localStorage as backup
+            localStorage.setItem('weddingItems', JSON.stringify(newItems));
+            
+            // Remove the wedding arrangement data from localStorage
+            const arrangementKey = `weddingArrangement-${weddingName}`;
+            localStorage.removeItem(arrangementKey);
+        } else {
+            alert('Failed to delete wedding from server. Please try again.');
+        }
+        
+        setLoading(false);
     };
 
     const handleRedirect = (name) => {
@@ -76,13 +222,15 @@ function EditableList() {
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
+                setLoading(true);
                 const jsonData = JSON.parse(e.target.result);
                 
                 // Validate JSON structure
                 if (!jsonData.weddingName) {
                     alert('Invalid JSON format. Missing wedding name.');
+                    setLoading(false);
                     return;
                 }
 
@@ -92,31 +240,63 @@ function EditableList() {
                 if (items.includes(weddingName)) {
                     const overwrite = window.confirm(`Wedding "${weddingName}" already exists. Do you want to overwrite it?`);
                     if (!overwrite) {
+                        setLoading(false);
                         return;
                     }
-                } else {
-                    // Add to wedding list if it doesn't exist
-                    const newItems = [...items, weddingName];
-                    setItems(newItems);
-                    localStorage.setItem('weddingItems', JSON.stringify(newItems));
                 }
 
-                // Store the complete arrangement data
-                const storageKey = `weddingArrangement-${weddingName}`;
-                const arrangementData = {
-                    savedGuestList: jsonData.guestList || [],
-                    savedTables: jsonData.tables ? jsonData.tables.map(table => table.guests || []) : [],
+                // Prepare wedding data for server
+                const weddingData = {
+                    weddingName: weddingName,
+                    exportDate: new Date().toISOString(),
+                    totalGuests: (jsonData.guestList || []).length,
+                    totalTables: (jsonData.tables || []).length,
+                    guestList: jsonData.guestList || [],
+                    tables: jsonData.tables || [],
+                    tableAliases: jsonData.tableAliases || {},
+                    tableSizes: jsonData.tableSizes || {},
+                    tableNumbers: jsonData.tableNumbers || {},
+                    metadata: {
+                        viewMode: "list",
+                        isGrouped: true,
+                        version: "1.0"
+                    }
                 };
-                localStorage.setItem(storageKey, JSON.stringify(arrangementData));
 
-                alert(`Wedding "${weddingName}" imported successfully!`);
-                
-                // Navigate to the imported wedding
-                navigate(`/wedding/${weddingName}`);
+                // Save to server
+                const success = await saveWeddingToServer(weddingName, weddingData);
+                if (success) {
+                    // Update local wedding list if it doesn't exist
+                    if (!items.includes(weddingName)) {
+                        const newItems = [...items, weddingName];
+                        setItems(newItems);
+                        localStorage.setItem('weddingItems', JSON.stringify(newItems));
+                    }
+
+                    // Store the complete arrangement data in localStorage as backup
+                    const storageKey = `weddingArrangement-${weddingName}`;
+                    const arrangementData = {
+                        savedGuestList: jsonData.guestList || [],
+                        savedTables: jsonData.tables ? jsonData.tables.map(table => table.guests || []) : [],
+                        savedTableAliases: jsonData.tableAliases || {},
+                        savedTableSizes: jsonData.tableSizes || {},
+                        savedTableNumbers: jsonData.tableNumbers || {}
+                    };
+                    localStorage.setItem(storageKey, JSON.stringify(arrangementData));
+
+                    alert(`Wedding "${weddingName}" imported successfully!`);
+                    
+                    // Navigate to the imported wedding
+                    navigate(`/wedding/${weddingName}`);
+                } else {
+                    alert('Failed to save wedding to server. Please try again.');
+                }
 
             } catch (error) {
                 alert('Error parsing JSON file. Please ensure it\'s a valid wedding arrangement file.');
                 console.error('JSON parse error:', error);
+            } finally {
+                setLoading(false);
             }
         };
         reader.readAsText(file);
@@ -265,10 +445,12 @@ function EditableList() {
         }
         
         try {
+            setLoading(true);
             const guests = await processCsvFile(csvFile);
             
             if (guests.length === 0) {
                 alert('No valid guests found in CSV. Please check the format:\nfirstName,lastName,group (ID is optional)');
+                setLoading(false);
                 return;
             }
             
@@ -276,50 +458,79 @@ function EditableList() {
             if (items.includes(trimmedName)) {
                 const overwrite = window.confirm(`Wedding "${trimmedName}" already exists. Do you want to overwrite it?`);
                 if (!overwrite) {
+                    setLoading(false);
                     return;
                 }
-            } else {
-                // Add to wedding list if it doesn't exist
-                const newItems = [...items, trimmedName];
-                setItems(newItems);
-                localStorage.setItem('weddingItems', JSON.stringify(newItems));
             }
             
-            // Store the arrangement data with imported guests
-            const storageKey = `weddingArrangement-${trimmedName}`;
-            const arrangementData = {
-                savedGuestList: guests,
-                savedTables: [],
-                savedTableAliases: {},
-                savedTableSizes: {},
-                savedTableNumbers: {}
+            // Prepare wedding data for server
+            const weddingData = {
+                weddingName: trimmedName,
+                exportDate: new Date().toISOString(),
+                totalGuests: guests.length,
+                totalTables: 0,
+                guestList: guests,
+                tables: [],
+                tableAliases: {},
+                tableSizes: {},
+                tableNumbers: {},
+                metadata: {
+                    viewMode: "list",
+                    isGrouped: true,
+                    version: "1.0"
+                }
             };
-            localStorage.setItem(storageKey, JSON.stringify(arrangementData));
             
-            // Count original guests vs +1 guests for better feedback
-            const originalGuests = guests.filter(guest => !guest.originalGuestId);
-            const additionalGuests = guests.filter(guest => guest.originalGuestId);
-            
-            let successMessage = `Wedding "${trimmedName}" created successfully!\n`;
-            successMessage += `Imported: ${originalGuests.length} original guests`;
-            if (additionalGuests.length > 0) {
-                successMessage += `, ${additionalGuests.length} additional guests (+1, +2, etc.)`;
+            // Save to server
+            const success = await saveWeddingToServer(trimmedName, weddingData);
+            if (success) {
+                // Update local wedding list if it doesn't exist
+                if (!items.includes(trimmedName)) {
+                    const newItems = [...items, trimmedName];
+                    setItems(newItems);
+                    localStorage.setItem('weddingItems', JSON.stringify(newItems));
+                }
+                
+                // Store the arrangement data with imported guests in localStorage as backup
+                const storageKey = `weddingArrangement-${trimmedName}`;
+                const arrangementData = {
+                    savedGuestList: guests,
+                    savedTables: [],
+                    savedTableAliases: {},
+                    savedTableSizes: {},
+                    savedTableNumbers: {}
+                };
+                localStorage.setItem(storageKey, JSON.stringify(arrangementData));
+                
+                // Count original guests vs +1 guests for better feedback
+                const originalGuests = guests.filter(guest => !guest.originalGuestId);
+                const additionalGuests = guests.filter(guest => guest.originalGuestId);
+                
+                let successMessage = `Wedding "${trimmedName}" created successfully!\n`;
+                successMessage += `Imported: ${originalGuests.length} original guests`;
+                if (additionalGuests.length > 0) {
+                    successMessage += `, ${additionalGuests.length} additional guests (+1, +2, etc.)`;
+                }
+                successMessage += `\nTotal: ${guests.length} guests`;
+                
+                alert(successMessage);
+                
+                // Reset modal state
+                setCsvModalOpen(false);
+                setCsvWeddingName('');
+                setCsvFile(null);
+                
+                // Navigate to the new wedding
+                navigate(`/wedding/${trimmedName}`);
+            } else {
+                alert('Failed to save wedding to server. Please try again.');
             }
-            successMessage += `\nTotal: ${guests.length} guests`;
-            
-            alert(successMessage);
-            
-            // Reset modal state
-            setCsvModalOpen(false);
-            setCsvWeddingName('');
-            setCsvFile(null);
-            
-            // Navigate to the new wedding
-            navigate(`/wedding/${trimmedName}`);
             
         } catch (error) {
             console.error('Error processing CSV:', error);
             alert('Error processing CSV file. Please check the format.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -331,6 +542,12 @@ function EditableList() {
 
     return (
         <div>
+            {loading && items.length === 0 && (
+                <div style={{ textAlign: 'center', margin: '2rem', fontSize: '1.2rem', color: '#666' }}>
+                    Loading weddings from server...
+                </div>
+            )}
+            
             <div className="inputWrapper">
                 <TextField
                     id="standard-basic"
@@ -338,14 +555,19 @@ function EditableList() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     placeholder="Enter wedding name"
+                    disabled={loading}
                     onKeyPress={(e) => {
                         if (e.key === 'Enter') {
                             handleAddClick();
                         }
                     }}
                 />
-                <Button variant="contained" onClick={handleAddClick}>
-                    {editingIndex !== null ? 'Update' : 'Add'}
+                <Button 
+                    variant="contained" 
+                    onClick={handleAddClick}
+                    disabled={loading}
+                >
+                    {loading ? 'Saving...' : (editingIndex !== null ? 'Update' : 'Add')}
                 </Button>
             </div>
             
@@ -356,14 +578,24 @@ function EditableList() {
                     onChange={handleJSONImport}
                     style={{ display: 'none' }}
                     id="json-import-input"
+                    disabled={loading}
                 />
                 <label htmlFor="json-import-input">
-                    <Button variant="outlined" component="span" style={{ marginRight: '1rem' }}>
-                        Import JSON File
+                    <Button 
+                        variant="outlined" 
+                        component="span" 
+                        style={{ marginRight: '1rem' }}
+                        disabled={loading}
+                    >
+                        {loading ? 'Loading...' : 'Import JSON File'}
                     </Button>
                 </label>
                 
-                <Button variant="outlined" onClick={handleCSVImportClick}>
+                <Button 
+                    variant="outlined" 
+                    onClick={handleCSVImportClick}
+                    disabled={loading}
+                >
                     Import from CSV
                 </Button>
             </div>
@@ -373,9 +605,24 @@ function EditableList() {
                     <ListItem key={index} className="listItem">
                         <ListItemText primary={item} className='listItemText' />
                         <div className="buttonGroup">
-                            <Button onClick={() => handleRedirect(item)}>Open</Button>
-                            <Button onClick={() => handleEditClick(index)}>Edit</Button>
-                            <Button onClick={() => handleDeleteClick(item)}>Delete</Button>
+                            <Button 
+                                onClick={() => handleRedirect(item)}
+                                disabled={loading}
+                            >
+                                Open
+                            </Button>
+                            <Button 
+                                onClick={() => handleEditClick(index)}
+                                disabled={loading}
+                            >
+                                Edit
+                            </Button>
+                            <Button 
+                                onClick={() => handleDeleteClick(item)}
+                                disabled={loading}
+                            >
+                                {loading ? 'Deleting...' : 'Delete'}
+                            </Button>
                         </div>
                     </ListItem>
                 ))}
@@ -422,6 +669,7 @@ function EditableList() {
                         value={csvWeddingName}
                         onChange={(e) => setCsvWeddingName(e.target.value)}
                         placeholder="Enter wedding name (no spaces)"
+                        disabled={loading}
                         sx={{ mb: 2 }}
                     />
                     
@@ -431,9 +679,16 @@ function EditableList() {
                         onChange={handleCSVFileSelect}
                         style={{ display: 'none' }}
                         id="csv-file-input"
+                        disabled={loading}
                     />
                     <label htmlFor="csv-file-input">
-                        <Button variant="outlined" component="span" fullWidth sx={{ mb: 2 }}>
+                        <Button 
+                            variant="outlined" 
+                            component="span" 
+                            fullWidth 
+                            sx={{ mb: 2 }}
+                            disabled={loading}
+                        >
                             {csvFile ? csvFile.name : 'Select CSV File'}
                         </Button>
                     </label>
@@ -443,15 +698,18 @@ function EditableList() {
                     </Typography>
                     
                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Button onClick={handleCSVModalClose}>
+                        <Button 
+                            onClick={handleCSVModalClose}
+                            disabled={loading}
+                        >
                             Cancel
                         </Button>
                         <Button 
                             variant="contained" 
                             onClick={handleCSVImport}
-                            disabled={!csvWeddingName.trim() || !csvFile}
+                            disabled={!csvWeddingName.trim() || !csvFile || loading}
                         >
-                            Import
+                            {loading ? 'Importing...' : 'Import'}
                         </Button>
                     </Box>
                 </Box>

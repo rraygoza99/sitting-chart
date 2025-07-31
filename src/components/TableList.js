@@ -31,6 +31,12 @@ const TableList = ({
     currentLanguage = 'english'
 }) => {
     const { t } = useSeatingTranslation(currentLanguage);
+    
+    // Helper function to safely get table length
+    const getTableLength = (table) => {
+        return Array.isArray(table) ? table.length : 0;
+    };
+    
     const renderListView = () => {
         return (
             <div className='tables-container'>
@@ -46,8 +52,8 @@ const TableList = ({
                     >
                         <div className="table-header"
                         style={{
-                            ...(table.length === getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-completed-color)', color:'var(--table-header-completed-text-color)' } : {}),
-                            ...(table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-oversized-color)', color:'var(--table-header-oversized-text-color)' } : {}),
+                            ...(getTableLength(table) === getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-completed-color)', color:'var(--table-header-completed-text-color)' } : {}),
+                            ...(getTableLength(table) > getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-oversized-color)', color:'var(--table-header-oversized-text-color)' } : {}),
                             ...(tableHasMatchingGuest(table) ? { 
                                 backgroundColor: 'var(--table-header-highlight-color, #c4ce40ff)', 
                                 border: '2px solid #1976d2',
@@ -101,7 +107,7 @@ const TableList = ({
                                             }}
                                         />
                                         <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold' }}>
-                                            {t('current')}: {table.length} {t('guests')}
+                                            {t('current')}: {getTableLength(table)} {t('guests')}
                                         </span>
                                     </div>
                                 </div>
@@ -116,7 +122,7 @@ const TableList = ({
                                         </span>
                                     </div>
                                     <div style={{ fontSize: '14px' }}>
-                                        {t('seated')}: {table.length}/{getTableDisplaySize(tableIndex)}
+                                        {t('seated')}: {getTableLength(table)}/{getTableDisplaySize(tableIndex)}
                                     </div>
                                 </div>
                             )}
@@ -130,7 +136,7 @@ const TableList = ({
                                 >
                                     <Icon>edit</Icon>
                                 </IconButton>
-                                {table.length > 0 && (
+                                {getTableLength(table) > 0 && (
                                     <IconButton
                                         onClick={() => onClearTable(tableIndex)}
                                         color="inherit"
@@ -144,7 +150,7 @@ const TableList = ({
                             </div>
                         </div>
                         <div className="table-content">
-                            {table.map((guest) => (
+                            {Array.isArray(table) ? table.map((guest) => (
                                 <div
                                     key={guest.id}
                                     draggable
@@ -180,7 +186,11 @@ const TableList = ({
                                         </IconButton>
                                     </div>
                                 </div>
-                            ))}
+                            )) : (
+                                <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                                    No guests data available
+                                </div>
+                            )}
                         </div>
                     </div>
                 ))}
@@ -307,7 +317,7 @@ const TableList = ({
                                             }}
                                         />
                                         <span style={{ fontSize: '10px', color: '#333' }}>
-                                            {t('current')}: {table.length}
+                                            {t('current')}: {getTableLength(table)}
                                         </span>
                                     </div>
                                 </div>
@@ -317,7 +327,7 @@ const TableList = ({
                                         {getTableDisplayName(tableIndex)} #{getTableDisplayNumber(tableIndex)}
                                     </div>
                                     <div style={{ fontSize: '11px' }}>
-                                        {table.length}/{getTableDisplaySize(tableIndex)}
+                                        {getTableLength(table)}/{getTableDisplaySize(tableIndex)}
                                     </div>
                                 </div>
                             )}
@@ -331,7 +341,7 @@ const TableList = ({
                                 >
                                     <Icon sx={{ fontSize: '16px' }}>edit</Icon>
                                 </IconButton>
-                                {table.length > 0 && (
+                                {getTableLength(table) > 0 && (
                                     <IconButton
                                         onClick={() => onClearTable(tableIndex)}
                                         color="error"
@@ -344,7 +354,7 @@ const TableList = ({
                                 )}
                             </div>
                         </div>
-                        {table.map((guest, index) => {
+                        {Array.isArray(table) ? table.map((guest, index) => {
                             const currentTableSize = getTableDisplaySize(tableIndex);
                             const angle = (index / currentTableSize) * 2 * Math.PI;
                             const radius = 120;
@@ -373,7 +383,18 @@ const TableList = ({
                                     <span>{highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}</span>
                                 </div>
                             );
-                        })}
+                        }) : (
+                            <div style={{ 
+                                position: 'absolute', 
+                                top: '50%', 
+                                left: '50%', 
+                                transform: 'translate(-50%, -50%)',
+                                color: '#666',
+                                fontSize: '12px'
+                            }}>
+                                No guests data
+                            </div>
+                        )}
                     </div>
                 ))}
                 

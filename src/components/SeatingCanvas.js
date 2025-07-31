@@ -57,6 +57,7 @@ function SeatingCanvas({ guests = [] }) {
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
     const [currentLanguage, setCurrentLanguage] = useState('english'); // Language state
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track unsaved changes
+    const [isLoading, setIsLoading] = useState(false); // Loading state for server operations
     
     // Split button state for Add actions
     const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -68,6 +69,55 @@ function SeatingCanvas({ guests = [] }) {
     
     // Translation hook
     const { t } = useSeatingTranslation(currentLanguage);
+
+    // API endpoint for S3 operations
+    const S3_API_BASE = "https://q5c7u5zmzc4l7r4warc6oslx4e0bgoqd.lambda-url.us-east-2.on.aws/api/s3";
+
+    // Load wedding data from S3
+    const loadWeddingFromServer = async (weddingName) => {
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${S3_API_BASE}/file/${weddingName}.json`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error loading wedding from server:', error);
+            return null;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Save wedding data to S3
+    const saveWeddingToServer = async (weddingName, weddingData) => {
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${S3_API_BASE}/upload`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fileName: `${weddingName}.json`,
+                    data: weddingData
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error saving wedding to server:', error);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Function to get the configured table size
     const getTableSize = useCallback(() => {
@@ -84,52 +134,114 @@ function SeatingCanvas({ guests = [] }) {
     }, []);
 
     const handleCloseAlert = () => setAlertOpen(false);
-    const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
-        const storageKey = `weddingArrangement-${weddingId || 'default'}`;
-        const savedData = localStorage.getItem(storageKey);
-        if (savedData) {
-            try {
+    
+    // Load wedding data from server
+    useEffect(() => {
+        const loadWeddingData = async () => {
+            if (!weddingId) {
+                // Handle case where there's no wedding ID
+                const initialGuestList = guests.map((guest, index) => ({
+                    ...guest,
+                    id: guest.id || `guest-${Date.now()}-${index}`,
+                }));
+                setGuestList(initialGuestList);
+                const totalGuests = guests.length;
+                const tableSize = getTableSize();
+                const requiredTables = Math.ceil(Math.max(totalGuests, 1) / tableSize);
+                setTables(Array(requiredTables).fill([]));
+                return;
+            }
+
+            // Try to load from server first
+            const serverData = await loadWeddingFromServer(weddingId);
+            
+            if (serverData) {
+                // Successfully loaded from server
+                // The server returns data with a nested structure: { content: { actualData } }
+                const contentData = serverData.content || serverData; // Handle both nested and flat structures
+                
+                // Handle both formats: direct properties (guestList, tables) and saved format (savedGuestList, savedTables)
                 const { 
+                    guestList: directGuestList,
+                    tables: directTables,
+                    tableAliases: directTableAliases,
+                    tableSizes: directTableSizes,
+                    tableNumbers: directTableNumbers,
                     savedGuestList, 
                     savedTables, 
-                    savedTableAliases = {}, 
-                    savedTableSizes = {}, 
-                    savedTableNumbers = {} 
-                } = JSON.parse(savedData);
-                const loadedGuestList = savedGuestList || [];
-                const loadedTables = savedTables || [];
+                    savedTableAliases, 
+                    savedTableSizes, 
+                    savedTableNumbers 
+                } = contentData;
+                
+                // Use saved format if available, otherwise use direct format
+                const loadedGuestList = savedGuestList || directGuestList || [];
+                const loadedTables = savedTables || directTables || [];
+                const loadedTableAliases = savedTableAliases || directTableAliases || {};
+                const loadedTableSizes = savedTableSizes || directTableSizes || {};
+                const loadedTableNumbers = savedTableNumbers || directTableNumbers || {};
+                
+                // Ensure loadedTables is an array of arrays, handling both formats:
+                // Format 1: Array of arrays (legacy format) - [[guest1, guest2], [guest3]]
+                // Format 2: Array of table objects (server format) - [{tableNumber: 1, guests: [guest1, guest2]}]
+                let safeTables;
+                if (Array.isArray(loadedTables)) {
+                    safeTables = loadedTables.map(table => {
+                        if (Array.isArray(table)) {
+                            // Legacy format: table is already an array of guests
+                            return table;
+                        } else if (table && typeof table === 'object' && Array.isArray(table.guests)) {
+                            // Server format: table is an object with a guests property
+                            return table.guests;
+                        } else {
+                            // Invalid format, return empty array
+                            return [];
+                        }
+                    });
+                } else {
+                    safeTables = [];
+                }
                 
                 setGuestList(loadedGuestList);
-                setTableAliases(savedTableAliases);
-                setTableSizes(savedTableSizes);
-                setTableNumbers(savedTableNumbers);
+                setTableAliases(loadedTableAliases);
+                setTableSizes(loadedTableSizes);
+                setTableNumbers(loadedTableNumbers);
                 
                 // Check if we have guests but no tables (e.g., CSV import from home page)
-                if (loadedGuestList.length > 0 && loadedTables.length === 0) {
+                if (loadedGuestList.length > 0 && safeTables.length === 0) {
                     const tableSize = getTableSize();
                     const requiredTables = Math.ceil(loadedGuestList.length / tableSize);
                     setTables(Array(requiredTables).fill([]));
                 } else {
-                    setTables(loadedTables);
+                    setTables(safeTables);
                 }
-            } catch (error) {
-                console.error('Error parsing saved data:', error);
-                setGuestList([]);
-                setTables([]);
+                
+                // No unsaved changes when loading from server
+                setHasUnsavedChanges(false);
+            } else {
+                // Server failed to load data - show error message
+                setAlertMessage('Failed to load wedding data from server. Please check your connection and try again.');
+                setAlertSeverity('error');
+                setAlertOpen(true);
+                
+                // Initialize with empty state
+                const initialGuestList = guests.map((guest, index) => ({
+                    ...guest,
+                    id: guest.id || `guest-${Date.now()}-${index}`,
+                }));
+                setGuestList(initialGuestList);
+                const totalGuests = guests.length;
+                const tableSize = getTableSize();
+                const requiredTables = Math.ceil(Math.max(totalGuests, 1) / tableSize);
+                setTables(Array(requiredTables).fill([]));
                 setTableAliases({});
                 setTableSizes({});
                 setTableNumbers({});
+                setHasUnsavedChanges(false);
             }
-        } else {
-            const initialGuestList = guests.map((guest, index) => ({
-                ...guest,
-                id: guest.id || `guest-${Date.now()}-${index}`,
-            }));
-            setGuestList(initialGuestList);
-            const totalGuests = guests.length;
-            const tableSize = getTableSize();
-            const requiredTables = Math.ceil(Math.max(totalGuests, 1) / tableSize);
-            setTables(Array(requiredTables).fill([]));        }
+        };
+
+        loadWeddingData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [weddingId]);
     useEffect(() => {
@@ -184,21 +296,45 @@ function SeatingCanvas({ guests = [] }) {
     };
 
 const saveArrangement = async () => {
+        if (!weddingId) {
+            setAlertMessage('Cannot save: No wedding ID provided');
+            setAlertSeverity('error');
+            setAlertOpen(true);
+            return;
+        }
+
         const dataToSave = {
-            savedGuestList: guestList,
-            savedTables: tables,
-            savedTableAliases: tableAliases,
-            savedTableSizes: tableSizes,
-            savedTableNumbers: tableNumbers
+            weddingName: weddingId,
+            exportDate: new Date().toISOString(),
+            totalGuests: guestList.length,
+            totalTables: tables.length,
+            guestList: guestList,
+            tables: tables,
+            tableAliases: tableAliases,
+            tableSizes: tableSizes,
+            tableNumbers: tableNumbers,
+            metadata: {
+                viewMode: viewMode,
+                isGrouped: isGrouped,
+                version: "1.0"
+            }
         };
-        localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
         
-        // Reset unsaved changes flag after successful save
-        setHasUnsavedChanges(false);
+        // Save to server
+        const success = await saveWeddingToServer(weddingId, dataToSave);
         
-        setAlertMessage(t('arrangementSaved'));
-        setAlertSeverity('success');
-        setAlertOpen(true);
+        if (success) {
+            // Reset unsaved changes flag after successful save
+            setHasUnsavedChanges(false);
+            
+            setAlertMessage(t('arrangementSaved'));
+            setAlertSeverity('success');
+            setAlertOpen(true);
+        } else {
+            setAlertMessage('Failed to save to server. Please check your connection and try again.');
+            setAlertSeverity('error');
+            setAlertOpen(true);
+        }
     };
 
     // Undo system functions
@@ -248,7 +384,7 @@ const saveArrangement = async () => {
     };
 
     const deleteArrangement = () => {
-        localStorage.removeItem(getStorageKey());
+        // Reset to initial state
         const initialGuestList = guests.map((guest, index) => ({ ...guest, id: `guest-${index}` }));
         setGuestList(initialGuestList.sort((a, b) => a.firstName.localeCompare(b.firstName)));
         const totalGuests = guests.length;
@@ -1435,6 +1571,41 @@ const saveArrangement = async () => {
 
     return (
         <div>
+            {/* Loading Overlay */}
+            {isLoading && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 9999,
+                    color: 'white',
+                    fontSize: '1.2rem'
+                }}>
+                    <div>
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            Loading...
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div className="loading-spinner" style={{
+                                border: '4px solid #f3f3f3',
+                                borderTop: '4px solid #3498db',
+                                borderRadius: '50%',
+                                width: '40px',
+                                height: '40px',
+                                animation: 'spin 2s linear infinite',
+                                margin: '0 auto'
+                            }}></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
             {/* Top Action Bar */}
                 <TopActionBar
                     onSave={saveArrangement}
@@ -1445,6 +1616,7 @@ const saveArrangement = async () => {
                     canUndo={undoHistory.length > 0}
                     hasUnsavedChanges={hasUnsavedChanges}
                     currentLanguage={currentLanguage}
+                    isDisabled={isLoading}
                 />            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}
                     <ConfigurationModal
