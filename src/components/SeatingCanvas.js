@@ -95,15 +95,18 @@ function SeatingCanvas({ guests = [] }) {
     const saveWeddingToServer = async (weddingName, weddingData) => {
         setIsLoading(true);
         try {
+            // Create a JSON blob as a file
+            const jsonBlob = new Blob([JSON.stringify(weddingData)], { 
+                type: 'application/json' 
+            });
+            
+            // Create form data with the file
+            const formData = new FormData();
+            formData.append('file', jsonBlob, `${weddingName}.json`);
+            
             const response = await fetch(`${S3_API_BASE}/upload`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    fileName: `${weddingName}.json`,
-                    data: weddingData
-                })
+                body: formData // Don't set Content-Type header, let browser set it for FormData
             });
             
             if (!response.ok) {
