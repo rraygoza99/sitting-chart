@@ -104,6 +104,7 @@ export const spanishTranslations = {
     'alphabeticalList': 'Lista Alfabética',
     'groupedByTables': 'Agrupado por Mesas',
     'exportTickets': 'Exportar Boletos',
+    'exportTicketsByGroup': 'Exportar Boletos por Grupo',
     'exportToJSON': 'Exportar a JSON',
     'downloadSampleCSV': 'Descargar CSV de Muestra',
     
@@ -167,6 +168,9 @@ export const spanishTranslations = {
     'generated': 'Generado',
     'wedding': 'Boda',
     'guestTicketList': 'Lista de Boletos de Invitados',
+    'guestTicketListByGroup': 'Lista de Boletos por Grupo',
+    'guestTicketsByGroupExported': '¡Boletos por grupo exportados a PDF exitosamente!',
+    'total': 'Total',
     
     // Search and Filtering
     'searchGuests': 'Buscar invitados...',

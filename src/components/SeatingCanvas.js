@@ -675,6 +675,115 @@ const saveArrangement = async () => {
         setAlertOpen(true);
     };
 
+    // Export ticket information grouped by guest group
+    const exportGuestTicketsByGroupToPDF = () => {
+        const doc = new jsPDF();
+
+        // Title
+        doc.setFontSize(18);
+        doc.text(t('guestTicketListByGroup') || 'Guest Tickets by Group', 20, 20);
+
+        // Wedding name if available
+        if (weddingId) {
+            doc.setFontSize(14);
+            doc.text(`${t('wedding') || 'Wedding'}: ${weddingId}`, 20, 35);
+        }
+
+        // Date
+        doc.setFontSize(12);
+        doc.text(`${t('generated') || 'Generated'}: ${new Date().toLocaleDateString()}`, 20, 50);
+
+        // Build dataset from guest list and tables
+        const allGuests = [...guestList, ...tables.flat()];
+
+        // Map originalId -> ticket count and original guest info
+        const originalMap = new Map();
+        allGuests.forEach(g => {
+            const originalId = g.originalGuestId || g.id;
+            if (!originalMap.has(originalId)) {
+                const originalGuest = allGuests.find(x => x.id === originalId) || g;
+                const relatedGuests = allGuests.filter(x => x.id === originalId || x.originalGuestId === originalId);
+                originalMap.set(originalId, {
+                    fullName: `${originalGuest.firstName || ''} ${originalGuest.lastName || ''}`.trim(),
+                    group: originalGuest.group || t('ungrouped') || 'Ungrouped',
+                    ticketCount: relatedGuests.length
+                });
+            }
+        });
+
+        // Group by group name
+        const groups = new Map();
+        for (const entry of originalMap.values()) {
+            if (!groups.has(entry.group)) groups.set(entry.group, []);
+            groups.get(entry.group).push({ fullName: entry.fullName, ticketCount: entry.ticketCount });
+        }
+
+        // Sort groups and entries
+        const sortedGroupNames = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b));
+        sortedGroupNames.forEach(groupName => {
+            groups.get(groupName).sort((a, b) => a.fullName.localeCompare(b.fullName));
+        });
+
+        // Render
+        let y = 70;
+        const pageHeight = 280;
+        const rowHeight = 7;
+
+        sortedGroupNames.forEach(groupName => {
+            const list = groups.get(groupName);
+            const totalTickets = list.reduce((s, g) => s + g.ticketCount, 0);
+
+            // Add page if near bottom
+            if (y + 20 > pageHeight) { doc.addPage(); y = 20; }
+
+            // Group header
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(`${t('group') || 'Group'}: ${groupName}`, 20, y);
+            y += 8;
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${t('total') || 'Total'} ${t('tickets') || 'Tickets'}: ${totalTickets}  |  ${t('guests') || 'Guests'}: ${list.length}`, 20, y);
+            y += 6;
+
+            // Header row
+            doc.setFont(undefined, 'bold');
+            doc.text(t('guestName') || 'Guest Name', 20, y);
+            doc.text(t('tickets') || 'Tickets', 160, y);
+            doc.line(20, y + 2, 190, y + 2);
+            y += 8;
+            doc.setFont(undefined, 'normal');
+
+            list.forEach(item => {
+                if (y + rowHeight > pageHeight) {
+                    doc.addPage();
+                    y = 20;
+                    // repeat header on new page
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`${t('group') || 'Group'}: ${groupName}`, 20, y);
+                    y += 8;
+                    doc.setFont(undefined, 'bold');
+                    doc.text(t('guestName') || 'Guest Name', 20, y);
+                    doc.text(t('tickets') || 'Tickets', 160, y);
+                    doc.line(20, y + 2, 190, y + 2);
+                    y += 8;
+                    doc.setFont(undefined, 'normal');
+                }
+                doc.text(item.fullName, 20, y);
+                doc.text(String(item.ticketCount), 160, y);
+                y += rowHeight;
+            });
+
+            y += 6; // space between groups
+        });
+
+        doc.save(`${weddingId || 'wedding'}_tickets_by_group.pdf`);
+
+        setAlertMessage(t('guestTicketsByGroupExported') || 'Guest tickets by group exported');
+        setAlertSeverity('success');
+        setAlertOpen(true);
+    };
+
     const downloadSampleCSV = () => {
         // Create sample CSV data with the expected format: Firstname,Lastname,Group (ID is optional)
         const sampleData = [
@@ -1615,6 +1724,7 @@ const saveArrangement = async () => {
                     onExportAlphabetical={exportToPDF}
                     onExportGrouped={exportToPDFGroupedByTables}
                     onExportTickets={exportGuestTicketsToPDF}
+                    onExportTicketsByGroup={exportGuestTicketsByGroupToPDF}
                     onUndo={performUndo}
                     canUndo={undoHistory.length > 0}
                     hasUnsavedChanges={hasUnsavedChanges}

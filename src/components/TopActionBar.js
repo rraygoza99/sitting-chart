@@ -27,6 +27,7 @@ function TopActionBar({
     onExportAlphabetical,
     onExportGrouped,
     onExportTickets,
+    onExportTicketsByGroup,
     onUndo,
     canUndo = false,
     hasUnsavedChanges = false, // Add prop to track unsaved changes
@@ -75,6 +76,8 @@ function TopActionBar({
             onExportGrouped();
         } else if (exportType === 'tickets') {
             onExportTickets();
+        } else if (exportType === 'ticketsByGroup') {
+            onExportTicketsByGroup();
         }
         setExportMenuOpen(false);
     };
@@ -187,6 +190,9 @@ function TopActionBar({
                                             </MenuItem>
                                             <MenuItem onClick={() => handleExportOption('tickets')}>
                                                 {t('exportTickets')}
+                                            </MenuItem>
+                                            <MenuItem onClick={() => handleExportOption('ticketsByGroup')}>
+                                                {t('exportTicketsByGroup')}
                                             </MenuItem>
                                         </MenuList>
                                     </ClickAwayListener>

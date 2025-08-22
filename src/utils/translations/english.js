@@ -104,6 +104,7 @@ export const englishTranslations = {
     'alphabeticalList': 'Alphabetical List',
     'groupedByTables': 'Grouped by Tables',
     'exportTickets': 'Export Tickets',
+    'exportTicketsByGroup': 'Export Tickets by Group',
     'exportToJSON': 'Export to JSON',
     'downloadSampleCSV': 'Download Sample CSV',
     
@@ -167,6 +168,9 @@ export const englishTranslations = {
     'generated': 'Generated',
     'wedding': 'Wedding',
     'guestTicketList': 'Guest Ticket List',
+    'guestTicketListByGroup': 'Guest Ticket List by Group',
+    'guestTicketsByGroupExported': 'Guest tickets by group exported to PDF successfully!',
+    'total': 'Total',
     
     // Search and Filtering
     'searchGuests': 'Search guests...',
