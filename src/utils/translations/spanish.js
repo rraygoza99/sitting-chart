@@ -107,6 +107,8 @@ export const spanishTranslations = {
     'exportTicketsByGroup': 'Exportar Boletos por Grupo',
     'exportToJSON': 'Exportar a JSON',
     'downloadSampleCSV': 'Descargar CSV de Muestra',
+    'guestManager': 'Gestor de Invitados',
+    'groupByGroup': 'Agrupar por grupo',
     
     // CSV Import
     'csvImport': 'Importar CSV',

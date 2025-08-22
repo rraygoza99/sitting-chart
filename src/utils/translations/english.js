@@ -107,6 +107,8 @@ export const englishTranslations = {
     'exportTicketsByGroup': 'Export Tickets by Group',
     'exportToJSON': 'Export to JSON',
     'downloadSampleCSV': 'Download Sample CSV',
+    'guestManager': 'Guest Manager',
+    'groupByGroup': 'Group by group',
     
     // CSV Import
     'csvImport': 'CSV Import',

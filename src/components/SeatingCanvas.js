@@ -26,6 +26,8 @@ import ConfigurationModal from './ConfigurationModal';
 import TopActionBar from './TopActionBar';
 import ContextMenu from './ContextMenu';
 import TableList from './TableList';
+import GuestManagerModal from './GuestManagerModal';
+import GroupIcon from '@mui/icons-material/Group';
 import './SeatingCanvas.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
@@ -52,8 +54,10 @@ function SeatingCanvas({ guests = [] }) {
     const [tableSizes, setTableSizes] = useState({});
     const [tableNumbers, setTableNumbers] = useState({}); // Custom table numbers for PDF export
     const [showAddGuestsModal, setShowAddGuestsModal] = useState(false);
+    const [showGuestManager, setShowGuestManager] = useState(false);
     const [newGuestsData, setNewGuestsData] = useState([]);
     const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed groups
+        const [customGroups, setCustomGroups] = useState([]); // Persisted custom groups (can be empty)
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
     const [currentLanguage, setCurrentLanguage] = useState('english'); // Language state
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track unsaved changes
@@ -170,11 +174,13 @@ function SeatingCanvas({ guests = [] }) {
                     tableAliases: directTableAliases,
                     tableSizes: directTableSizes,
                     tableNumbers: directTableNumbers,
+                        customGroups: directCustomGroups,
                     savedGuestList, 
                     savedTables, 
                     savedTableAliases, 
                     savedTableSizes, 
-                    savedTableNumbers 
+                    savedTableNumbers,
+                    savedCustomGroups 
                 } = contentData;
                 
                 // Use saved format if available, otherwise use direct format
@@ -183,6 +189,7 @@ function SeatingCanvas({ guests = [] }) {
                 const loadedTableAliases = savedTableAliases || directTableAliases || {};
                 const loadedTableSizes = savedTableSizes || directTableSizes || {};
                 const loadedTableNumbers = savedTableNumbers || directTableNumbers || {};
+                const loadedCustomGroups = savedCustomGroups || directCustomGroups || [];
                 
                 // Ensure loadedTables is an array of arrays, handling both formats:
                 // Format 1: Array of arrays (legacy format) - [[guest1, guest2], [guest3]]
@@ -209,6 +216,7 @@ function SeatingCanvas({ guests = [] }) {
                 setTableAliases(loadedTableAliases);
                 setTableSizes(loadedTableSizes);
                 setTableNumbers(loadedTableNumbers);
+                setCustomGroups(Array.isArray(loadedCustomGroups) ? loadedCustomGroups : []);
                 
                 // Check if we have guests but no tables (e.g., CSV import from home page)
                 if (loadedGuestList.length > 0 && safeTables.length === 0) {
@@ -316,6 +324,7 @@ const saveArrangement = async () => {
             tableAliases: tableAliases,
             tableSizes: tableSizes,
             tableNumbers: tableNumbers,
+            customGroups: customGroups,
             metadata: {
                 viewMode: viewMode,
                 isGrouped: isGrouped,
@@ -397,6 +406,7 @@ const saveArrangement = async () => {
         setTableAliases({}); // Reset table aliases
         setTableSizes({}); // Reset table sizes
         setTableNumbers({}); // Reset table numbers
+    setCustomGroups([]); // Reset custom groups
         setAlertMessage(t('arrangementDeleted'));
         setAlertSeverity('warning');
         setAlertOpen(true);
@@ -1006,7 +1016,8 @@ const saveArrangement = async () => {
         return false;
     };
     const handleAddPlusOne = (guest) => {
-        
+        // Track action and mark as unsaved
+        saveStateToHistory(`Added +1 for ${guest.firstName} ${guest.lastName}`);
         setGuestList(prevGuestList => [
             ...prevGuestList,
             {
@@ -1018,6 +1029,7 @@ const saveArrangement = async () => {
             },
         ]);
         updateTables(guestList.length + 1);
+        setHasUnsavedChanges(true);
     };
 
     const handleSelectGuest = (guestId) => {
@@ -1063,11 +1075,75 @@ const saveArrangement = async () => {
     };
 
     const removeSelectedGuests = () => {
+        if (selectedGuests.size > 0) {
+            saveStateToHistory(`Deleted ${selectedGuests.size} guest(s) from guest list`);
+        }
         setGuestList(prevGuestList =>
             prevGuestList.filter(guest => !selectedGuests.has(guest.id))
         );
         setSelectedGuests(new Set());
         setContextMenu({ visible: false, x: 0, y: 0 }); // Hide context menu
+        setHasUnsavedChanges(true);
+    };
+
+    // Guest Manager handlers
+    const handleManagerAddPlusOne = (originalId) => {
+        const primary = [...guestList, ...tables.flat()].find(g => g.id === originalId);
+        if (primary) {
+            handleAddPlusOne(primary);
+        }
+    };
+
+    const handleManagerRenameGuest = (originalId, newFirst, newLast) => {
+        // Rename the primary guest only
+        setGuestList(prev => prev.map(g => g.id === originalId ? { ...g, firstName: newFirst, lastName: newLast } : g));
+        setTables(prev => prev.map(t => t.map(g => g.id === originalId ? { ...g, firstName: newFirst, lastName: newLast } : g)));
+        saveStateToHistory(`Renamed guest to ${newFirst} ${newLast}`);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleManagerDeleteGuest = (originalId) => {
+        // Remove primary and all plus ones linked to it from both guestList and tables
+        saveStateToHistory(`Deleted guest ${originalId} and their tickets`);
+        setGuestList(prev => prev.filter(g => g.id !== originalId && g.originalGuestId !== originalId));
+        setTables(prev => prev.map(t => t.filter(g => g.id !== originalId && g.originalGuestId !== originalId)));
+        setHasUnsavedChanges(true);
+    };
+
+    const handleManagerAddGuest = ({ firstName, lastName, group }) => {
+        const nextId = getNextGuestId();
+        const newGuest = { id: nextId, firstName, lastName, group: group || 'Ungrouped' };
+        saveStateToHistory(`Added guest ${firstName} ${lastName}`);
+        // Create the group if it doesn't exist yet
+        const grp = (group || 'Ungrouped').trim();
+        if (grp && !getUniqueGroups().includes(grp)) {
+            setCustomGroups(prev => {
+                const set = new Set(prev || []);
+                set.add(grp);
+                return Array.from(set);
+            });
+        }
+        setGuestList(prev => [...prev, newGuest]);
+        updateTables(guestList.length + 1);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleManagerChangeGroup = (originalId, newGroupName) => {
+        const trimmed = (newGroupName || '').trim();
+        if (!trimmed) return;
+        saveStateToHistory(`Changed group of guest ${originalId} to "${trimmed}"`);
+        // Persist the group if it's new
+        if (!getUniqueGroups().includes(trimmed)) {
+            setCustomGroups(prev => {
+                const set = new Set(prev || []);
+                set.add(trimmed);
+                return Array.from(set);
+            });
+        }
+        // Update only the primary guest's group (plus ones keep their group inherited visually)
+        setGuestList(prev => prev.map(g => g.id === originalId ? { ...g, group: trimmed } : g));
+        setTables(prev => prev.map(t => t.map(g => g.id === originalId ? { ...g, group: trimmed } : g)));
+        setHasUnsavedChanges(true);
     };
 
     const handleContextMenu = (e, guestId = null) => {
@@ -1093,7 +1169,8 @@ const saveArrangement = async () => {
     };
 
     const getUniqueGroups = () => {
-        const groups = new Set();
+        // Merge persisted custom groups with groups inferred from current guests
+        const groups = new Set(Array.isArray(customGroups) ? customGroups : []);
         guestList.forEach(guest => {
             if (guest.group) {
                 groups.add(guest.group);
@@ -1165,10 +1242,14 @@ const saveArrangement = async () => {
     };
 
     const changeGuestGroup = (newGroup) => {
+        const trimmed = (newGroup || '').trim();
+        if (!trimmed) return;
+
+        saveStateToHistory(`Changed group for ${selectedGuests.size} guest(s) to "${trimmed}"`);
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
                 selectedGuests.has(guest.id)
-                    ? { ...guest, group: newGroup }
+                    ? { ...guest, group: trimmed }
                     : guest
             )
         );
@@ -1177,7 +1258,7 @@ const saveArrangement = async () => {
             prevTables.map(table =>
                 table.map(guest =>
                     selectedGuests.has(guest.id)
-                        ? { ...guest, group: newGroup }
+                        ? { ...guest, group: trimmed }
                         : guest
                 )
             )
@@ -1185,8 +1266,9 @@ const saveArrangement = async () => {
 
         setSelectedGuests(new Set());
         hideContextMenu();
+        setHasUnsavedChanges(true);
         
-        setAlertMessage(`Successfully changed group for ${selectedGuests.size} guest(s) to "${newGroup}"`);
+        setAlertMessage(`Successfully changed group for ${selectedGuests.size} guest(s) to "${trimmed}"`);
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -1202,9 +1284,22 @@ const saveArrangement = async () => {
     };
 
     const saveNewGroup = () => {
-        if (!newGroupName.trim()) return;
-        
-        changeGuestGroup(newGroupName.trim());
+        const name = newGroupName.trim();
+        if (!name) return;
+
+        // Always add to custom groups
+        setCustomGroups(prev => {
+            const set = new Set(prev || []);
+            set.add(name);
+            return Array.from(set);
+        });
+    setHasUnsavedChanges(true);
+
+        // If there are selected guests, move them to the new group
+        if (selectedGuests.size > 0) {
+            changeGuestGroup(name);
+        }
+
         closeNewGroupModal();
     };
 
@@ -1368,8 +1463,10 @@ const saveArrangement = async () => {
             id: nextId++
         }));
 
-        setGuestList(prevGuestList => [...prevGuestList, ...guestsToAdd]);
+    saveStateToHistory(`Added ${guestsToAdd.length} guest(s)`);
+    setGuestList(prevGuestList => [...prevGuestList, ...guestsToAdd]);
         updateTables(guestList.length + guestsToAdd.length);
+    setHasUnsavedChanges(true);
         
         setAlertMessage(t('guestAdded', { count: guestsToAdd.length }));
         setAlertSeverity('success');
@@ -1890,6 +1987,7 @@ const saveArrangement = async () => {
                         >
                             Add Row
                         </Button>
+                        
                     </Box>
                     
                     <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -1909,6 +2007,20 @@ const saveArrangement = async () => {
                     </Box>
                 </Box>
             </Modal>
+
+            {/* Guest Manager Modal */}
+            <GuestManagerModal
+                open={showGuestManager}
+                onClose={() => setShowGuestManager(false)}
+                currentLanguage={currentLanguage}
+                allGuests={[...guestList, ...tables.flat()]}
+                onAddPlusOne={handleManagerAddPlusOne}
+                onRenameGuest={handleManagerRenameGuest}
+                onDeleteGuest={handleManagerDeleteGuest}
+                onAddGuest={handleManagerAddGuest}
+                onChangeGroup={handleManagerChangeGroup}
+                groups={getUniqueGroups()}
+            />
 
             {/* Edit Guest Modal */}
             <Modal
@@ -2092,6 +2204,14 @@ const saveArrangement = async () => {
                             >
                                 <PersonRemoveIcon />
                             </Button>
+                            <Button
+                            variant="outlined"
+                            onClick={() => setShowGuestManager(true)}
+                            size="small"
+                            className='guest-manager-button'
+                        >
+                            <GroupIcon />
+                        </Button>
                         </div>
                     </div>
                     
