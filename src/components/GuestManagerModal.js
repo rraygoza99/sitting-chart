@@ -19,6 +19,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import Collapse from '@mui/material/Collapse';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PlusOneIcon from '@mui/icons-material/PlusOne';
@@ -62,6 +63,8 @@ function GuestManagerModal({
   const [groupDialogGuestId, setGroupDialogGuestId] = useState(null);
   const [groupDialogValue, setGroupDialogValue] = useState('');
   const [rowOpen, setRowOpen] = useState({}); // id -> boolean
+  const [sortBy, setSortBy] = useState('lastName'); // 'lastName' | 'firstName'
+  const [sortOrder, setSortOrder] = useState('asc'); // 'asc' | 'desc'
 
   // Build primary guests with ticket counts
   const primaryRows = useMemo(() => {
@@ -85,10 +88,29 @@ function GuestManagerModal({
       row.tickets += 1;
     });
 
-    return Array.from(map.values()).sort((a, b) => (
-      (a.lastName || '').localeCompare(b.lastName || '') || (a.firstName || '').localeCompare(b.firstName || '')
-    ));
+    return Array.from(map.values());
   }, [allGuests]);
+
+  // Create sorting comparator
+  const comparator = useMemo(() => {
+    return (a, b) => {
+      const aPrimary = (a[sortBy] || '').toString();
+      const bPrimary = (b[sortBy] || '').toString();
+      let cmp = aPrimary.localeCompare(bPrimary, undefined, { sensitivity: 'base' });
+      if (cmp === 0) {
+        const secondaryKey = sortBy === 'lastName' ? 'firstName' : 'lastName';
+        const aSec = (a[secondaryKey] || '').toString();
+        const bSec = (b[secondaryKey] || '').toString();
+        cmp = aSec.localeCompare(bSec, undefined, { sensitivity: 'base' });
+      }
+      return sortOrder === 'asc' ? cmp : -cmp;
+    };
+  }, [sortBy, sortOrder]);
+
+  // Apply sorting to primary rows
+  const sortedPrimaryRows = useMemo(() => {
+    return [...primaryRows].sort(comparator);
+  }, [primaryRows, comparator]);
 
   const grouped = useMemo(() => {
     const result = new Map();
@@ -98,11 +120,18 @@ function GuestManagerModal({
       result.get(g).push(row);
     });
     const sorted = Array.from(result.entries()).sort(([a], [b]) => a.localeCompare(b));
-    sorted.forEach(([, rows]) => rows.sort((r1, r2) => (
-      (r1.lastName || '').localeCompare(r2.lastName || '') || (r1.firstName || '').localeCompare(r2.firstName || '')
-    )));
+    sorted.forEach(([, rows]) => rows.sort(comparator));
     return new Map(sorted);
-  }, [primaryRows]);
+  }, [primaryRows, comparator]);
+
+  const handleRequestSort = (property) => {
+    if (sortBy === property) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(property);
+      setSortOrder('asc');
+    }
+  };
 
   const handleAddGuest = () => {
     if (!newFirstName.trim() || !newLastName.trim()) return;
@@ -153,15 +182,31 @@ function GuestManagerModal({
               <TableHead>
                 <TableRow>
                   <TableCell />
-                  <TableCell>{t('lastName')}</TableCell>
-                  <TableCell>{t('firstName')}</TableCell>
+                  <TableCell sortDirection={sortBy === 'lastName' ? sortOrder : false}>
+                    <TableSortLabel
+                      active={sortBy === 'lastName'}
+                      direction={sortBy === 'lastName' ? sortOrder : 'asc'}
+                      onClick={() => handleRequestSort('lastName')}
+                    >
+                      {t('lastName')}
+                    </TableSortLabel>
+                  </TableCell>
+                  <TableCell sortDirection={sortBy === 'firstName' ? sortOrder : false}>
+                    <TableSortLabel
+                      active={sortBy === 'firstName'}
+                      direction={sortBy === 'firstName' ? sortOrder : 'asc'}
+                      onClick={() => handleRequestSort('firstName')}
+                    >
+                      {t('firstName')}
+                    </TableSortLabel>
+                  </TableCell>
                   <TableCell>{t('group')}</TableCell>
                   <TableCell align="right">{t('tickets')}</TableCell>
                   <TableCell align="right">{t('actions')}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {primaryRows.map(row => (
+                {sortedPrimaryRows.map(row => (
                   <PrimaryRow
                     key={row.id}
                     row={row}
@@ -193,8 +238,24 @@ function GuestManagerModal({
                   <TableHead>
                     <TableRow>
                       <TableCell />
-                      <TableCell>{t('lastName')}</TableCell>
-                      <TableCell>{t('firstName')}</TableCell>
+                      <TableCell sortDirection={sortBy === 'lastName' ? sortOrder : false}>
+                        <TableSortLabel
+                          active={sortBy === 'lastName'}
+                          direction={sortBy === 'lastName' ? sortOrder : 'asc'}
+                          onClick={() => handleRequestSort('lastName')}
+                        >
+                          {t('lastName')}
+                        </TableSortLabel>
+                      </TableCell>
+                      <TableCell sortDirection={sortBy === 'firstName' ? sortOrder : false}>
+                        <TableSortLabel
+                          active={sortBy === 'firstName'}
+                          direction={sortBy === 'firstName' ? sortOrder : 'asc'}
+                          onClick={() => handleRequestSort('firstName')}
+                        >
+                          {t('firstName')}
+                        </TableSortLabel>
+                      </TableCell>
                       <TableCell>{t('group')}</TableCell>
                       <TableCell align="right">{t('tickets')}</TableCell>
                       <TableCell align="right">{t('actions')}</TableCell>
