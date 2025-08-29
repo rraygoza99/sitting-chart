@@ -200,8 +200,8 @@ function GuestManagerModal({
                       {t('firstName')}
                     </TableSortLabel>
                   </TableCell>
-                  <TableCell>{t('group')}</TableCell>
                   <TableCell align="right">{t('tickets')}</TableCell>
+                  <TableCell>{t('group')}</TableCell>
                   <TableCell align="right">{t('actions')}</TableCell>
                 </TableRow>
               </TableHead>
@@ -256,8 +256,8 @@ function GuestManagerModal({
                           {t('firstName')}
                         </TableSortLabel>
                       </TableCell>
-                      <TableCell>{t('group')}</TableCell>
                       <TableCell align="right">{t('tickets')}</TableCell>
+                      <TableCell>{t('group')}</TableCell>
                       <TableCell align="right">{t('actions')}</TableCell>
                     </TableRow>
                   </TableHead>
