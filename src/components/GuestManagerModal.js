@@ -200,7 +200,7 @@ function GuestManagerModal({
                       {t('firstName')}
                     </TableSortLabel>
                   </TableCell>
-                  <TableCell align="right">{t('tickets')}</TableCell>
+                  <TableCell align="left">{t('tickets')}</TableCell>
                   <TableCell>{t('group')}</TableCell>
                   <TableCell align="right">{t('actions')}</TableCell>
                 </TableRow>
@@ -256,7 +256,7 @@ function GuestManagerModal({
                           {t('firstName')}
                         </TableSortLabel>
                       </TableCell>
-                      <TableCell align="right">{t('tickets')}</TableCell>
+                      <TableCell align="left">{t('tickets')}</TableCell>
                       <TableCell>{t('group')}</TableCell>
                       <TableCell align="right">{t('actions')}</TableCell>
                     </TableRow>
@@ -357,8 +357,8 @@ function PrimaryRow({ row, allGuests, open, setOpen, t, onAddPlusOne, onDeleteGu
         <TableCell sx={{ minWidth: 160 }}>
           <TextField size="small" value={editFirst} onChange={(e) => setEditFirst(e.target.value)} onBlur={commitPrimaryRename} />
         </TableCell>
+        <TableCell align="left">{row.tickets}</TableCell>
         <TableCell sx={{ minWidth: 140 }}>{row.group || 'Ungrouped'}</TableCell>
-        <TableCell align="right">{row.tickets}</TableCell>
         <TableCell align="right">
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
             <IconButton size="small" color="secondary" onClick={onChangeGroup} title={t('changeGroup')}>
