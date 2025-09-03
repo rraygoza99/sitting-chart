@@ -1836,6 +1836,9 @@ const saveArrangement = async () => {
         p: 4,
     };
 
+    // Calculate total seated guests
+    const totalSeatedGuests = tables.flat().length;
+
     return (
         <div>
             {/* Loading Overlay */}
@@ -1885,7 +1888,9 @@ const saveArrangement = async () => {
                     hasUnsavedChanges={hasUnsavedChanges}
                     currentLanguage={currentLanguage}
                     isDisabled={isLoading}
-                />            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
+                    totalSeatedGuests={totalSeatedGuests}
+                />
+            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}
                     <ConfigurationModal
                         onExportToJSON={exportToJSON}

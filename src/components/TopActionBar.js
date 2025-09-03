@@ -31,7 +31,8 @@ function TopActionBar({
     onUndo,
     canUndo = false,
     hasUnsavedChanges = false, // Add prop to track unsaved changes
-    currentLanguage = 'english' // Add currentLanguage prop
+    currentLanguage = 'english', // Add currentLanguage prop
+    totalSeatedGuests = 0
 }) {
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -111,6 +112,9 @@ function TopActionBar({
                 
                 <div className="top-action-bar-right">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span style={{ fontWeight: 500, fontSize: 15, color: '#333', marginRight: 8 }}>
+                            {t('totalSeatedGuests') || 'Total Seated Guests'}: {totalSeatedGuests}
+                        </span>
                         <IconButton
                             variant="contained"
                             color="secondary"
