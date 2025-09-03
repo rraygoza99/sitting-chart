@@ -208,7 +208,8 @@ export const spanishTranslations = {
     'processing': 'Procesando...',
     'complete': 'Completo',
     'failed': 'Falló',
-    
+    'totalSeatedGuests': 'Invitados Sentados',
+
     // Accessibility
     'ariaLabelPDFExport': 'Opciones de exportación PDF',
     'ariaLabelConfiguration': 'Configuración del sistema',

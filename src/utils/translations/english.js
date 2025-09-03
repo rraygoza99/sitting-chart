@@ -208,6 +208,7 @@ export const englishTranslations = {
     'processing': 'Processing...',
     'complete': 'Complete',
     'failed': 'Failed',
+    'totalSeatedGuests': 'Seated Guests',
     
     // Accessibility
     'ariaLabelPDFExport': 'PDF export options',
