@@ -26,6 +26,7 @@ import PlusOneIcon from '@mui/icons-material/PlusOne';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import LabelIcon from '@mui/icons-material/Label';
+import ChildFriendlyIcon from '@mui/icons-material/ChildFriendly';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 const modalStyle = {
@@ -48,6 +49,7 @@ function GuestManagerModal({
   currentLanguage = 'english',
   allGuests = [],
   onAddPlusOne,
+  onAddChild,
   onRenameGuest,
   onDeleteGuest,
   onAddGuest,
@@ -214,6 +216,7 @@ function GuestManagerModal({
                     open={!!rowOpen[row.id]}
                     setOpen={(v) => setRowOpen(prev => ({ ...prev, [row.id]: v }))}
                     t={t}
+                    onAddChild={onAddChild}
                     onAddPlusOne={onAddPlusOne}
                     onDeleteGuest={onDeleteGuest}
                     onRenameGuest={onRenameGuest}
@@ -271,6 +274,7 @@ function GuestManagerModal({
                         setOpen={(v) => setRowOpen(prev => ({ ...prev, [row.id]: v }))}
                         t={t}
                         onAddPlusOne={onAddPlusOne}
+                        onAddChild={onAddChild}
                         onDeleteGuest={onDeleteGuest}
                         onRenameGuest={onRenameGuest}
                         onChangeGroup={() => {
@@ -284,8 +288,8 @@ function GuestManagerModal({
                 </Table>
               </TableContainer>
             </Box>
-          ))
-        )}
+          )))
+        }
 
         {/* Change Group Dialog */}
         <Modal open={groupDialogOpen} onClose={() => setGroupDialogOpen(false)} aria-labelledby="change-group-modal-title">
@@ -330,12 +334,17 @@ function GuestManagerModal({
 export default GuestManagerModal;
 
 // Row component for primary guest with collapsible +1 list
-function PrimaryRow({ row, allGuests, open, setOpen, t, onAddPlusOne, onDeleteGuest, onRenameGuest, onChangeGroup }) {
+function PrimaryRow({ row, allGuests, open, setOpen, t, onAddPlusOne, onDeleteGuest, onRenameGuest, onChangeGroup, onAddChild }) {
   const [editFirst, setEditFirst] = useState(row.firstName || '');
   const [editLast, setEditLast] = useState(row.lastName || '');
 
   const plusOnes = useMemo(
-    () => allGuests.filter(g => g.originalGuestId === row.id && g.id !== row.id),
+    () => allGuests.filter(g => g.originalGuestId === row.id && !g.isChild),
+    [allGuests, row.id]
+  );
+
+  const children = useMemo(
+    () => allGuests.filter(g => g.originalGuestId === row.id && g.isChild),
     [allGuests, row.id]
   );
 
@@ -367,6 +376,9 @@ function PrimaryRow({ row, allGuests, open, setOpen, t, onAddPlusOne, onDeleteGu
             <IconButton size="small" color="primary" onClick={() => onAddPlusOne && onAddPlusOne(row.id)} title={t('addPlusOne') || '+1'}>
               <PlusOneIcon />
             </IconButton>
+            <IconButton size="small" color="primary" onClick={() => onAddChild && onAddChild(row.id)} title={t('addChild') || 'Add Child'}>
+              <ChildFriendlyIcon />
+            </IconButton>
             <IconButton size="small" color="error" onClick={() => onDeleteGuest && onDeleteGuest(row.id)} title={t('delete')}>
               <DeleteIcon />
             </IconButton>
@@ -377,29 +389,51 @@ function PrimaryRow({ row, allGuests, open, setOpen, t, onAddPlusOne, onDeleteGu
         <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={6}>
           <Collapse in={open} timeout="auto" unmountOnExit>
             <Box sx={{ margin: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('guests')} +1</Typography>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>{t('lastName')}</TableCell>
-                    <TableCell>{t('firstName')}</TableCell>
-                    <TableCell>{t('group')}</TableCell>
-                    <TableCell align="right">{t('actions')}</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {plusOnes.map(po => (
-                    <PlusOneRow key={po.id} guest={po} t={t} onRenameGuest={onRenameGuest} onDeleteGuest={onDeleteGuest} />
-                  ))}
-                  {plusOnes.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={4} sx={{ color: 'text.secondary' }}>
-                        {t('noSearchResults') || 'No results'}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+              {plusOnes.length > 0 && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('guests')} +1</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>{t('lastName')}</TableCell>
+                        <TableCell>{t('firstName')}</TableCell>
+                        <TableCell>{t('group')}</TableCell>
+                        <TableCell align="right">{t('actions')}</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {plusOnes.map(po => (
+                        <PlusOneRow key={po.id} guest={po} t={t} onRenameGuest={onRenameGuest} onDeleteGuest={onDeleteGuest} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+              {children.length > 0 && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>{t('children')}</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>{t('lastName')}</TableCell>
+                        <TableCell>{t('firstName')}</TableCell>
+                        <TableCell>{t('group')}</TableCell>
+                        <TableCell align="right">{t('actions')}</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {children.map(child => (
+                        <PlusOneRow key={child.id} guest={child} t={t} onRenameGuest={onRenameGuest} onDeleteGuest={onDeleteGuest} />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+              {plusOnes.length === 0 && children.length === 0 && (
+                <Typography sx={{ color: 'text.secondary', p: 2 }}>
+                  {t('noPlusOnesOrChildren', 'No +1s or children for this guest.')}
+                </Typography>
+              )}
             </Box>
           </Collapse>
         </TableCell>

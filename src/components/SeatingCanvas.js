@@ -28,6 +28,7 @@ import ContextMenu from './ContextMenu';
 import TableList from './TableList';
 import GuestManagerModal from './GuestManagerModal';
 import GroupIcon from '@mui/icons-material/Group';
+import ChildFriendlyIcon from '@mui/icons-material/ChildFriendly';
 import './SeatingCanvas.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
@@ -243,7 +244,7 @@ function SeatingCanvas({ guests = [] }) {
                 setGuestList(initialGuestList);
                 const totalGuests = guests.length;
                 const tableSize = getTableSize();
-                const requiredTables = Math.ceil(Math.max(totalGuests, 1) / tableSize);
+                const requiredTables = Math.ceil(totalGuests / tableSize);
                 setTables(Array(requiredTables).fill([]));
                 setTableAliases({});
                 setTableSizes({});
@@ -425,7 +426,16 @@ const saveArrangement = async () => {
             });
         });
 
-        allGuests.sort((a, b) => {
+        const adults = allGuests.filter(g => !g.isChild);
+        const children = allGuests.filter(g => g.isChild);
+
+        adults.sort((a, b) => {
+            const lastNameA = (a.lastName || '').toLowerCase();
+            const lastNameB = (b.lastName || '').toLowerCase();
+            return lastNameA.localeCompare(lastNameB);
+        });
+
+        children.sort((a, b) => {
             const lastNameA = (a.lastName || '').toLowerCase();
             const lastNameB = (b.lastName || '').toLowerCase();
             return lastNameA.localeCompare(lastNameB);
@@ -436,35 +446,50 @@ const saveArrangement = async () => {
         const rowHeight = 8;
         const columnWidths = [60, 60, 30];
 
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text(t('lastName'), 10, currentY);
-        doc.text(t('firstName'), 10 + columnWidths[0], currentY);
-        doc.text(t('tableNumber'), 10 + columnWidths[0] + columnWidths[1], currentY);
-        
-        doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
-        currentY += 10;
+        const addHeader = () => {
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(t('lastName'), 10, currentY);
+            doc.text(t('firstName'), 10 + columnWidths[0], currentY);
+            doc.text(t('tableNumber'), 10 + columnWidths[0] + columnWidths[1], currentY);
+            
+            doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
+            currentY += 10;
+            doc.setFont(undefined, 'normal');
+        };
 
-        doc.setFont(undefined, 'normal');
-        allGuests.forEach((guest) => {
-            if (currentY + rowHeight > pageHeight) {
+        addHeader();
+
+        const addGuestRows = (guestList) => {
+            guestList.forEach((guest) => {
+                if (currentY + rowHeight > pageHeight) {
+                    doc.addPage();
+                    currentY = 20;
+                    addHeader();
+                }
+
+                doc.text(guest.lastName || '', 10, currentY);
+                doc.text(guest.firstName || '', 10 + columnWidths[0], currentY);
+                doc.text(guest.tableNumber.toString(), 10 + columnWidths[0] + columnWidths[1], currentY);
+                currentY += rowHeight;
+            });
+        };
+
+        addGuestRows(adults);
+
+        if (children.length > 0) {
+            if (currentY + rowHeight * 2 > pageHeight) {
                 doc.addPage();
                 currentY = 20;
-                
-                doc.setFont(undefined, 'bold');
-                doc.text('Last Name', 10, currentY);
-                doc.text('First Name', 10 + columnWidths[0], currentY);
-                doc.text('Table #', 10 + columnWidths[0] + columnWidths[1], currentY);
-                doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
-                currentY += 10;
-                doc.setFont(undefined, 'normal');
             }
-
-            doc.text(guest.lastName || '', 10, currentY);
-            doc.text(guest.firstName || '', 10 + columnWidths[0], currentY);
-            doc.text(guest.tableNumber.toString(), 10 + columnWidths[0] + columnWidths[1], currentY);
-            currentY += rowHeight;
-        });
+            currentY += 10;
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(t('children') || 'Children', 10, currentY);
+            currentY += 10;
+            addHeader();
+            addGuestRows(children);
+        }
 
         doc.save('Wedding_Seating_Arrangement.pdf');
     };
@@ -503,26 +528,51 @@ const saveArrangement = async () => {
             
             currentY += tableHeaderHeight + 5;
 
+            const adults = table.filter(g => !g.isChild);
+            const children = table.filter(g => g.isChild);
+
             // Sort guests by last name
-            const sortedGuests = [...table].sort((a, b) => {
+            adults.sort((a, b) => {
                 const lastNameA = (a.lastName || '').toLowerCase();
                 const lastNameB = (b.lastName || '').toLowerCase();
                 return lastNameA.localeCompare(lastNameB);
             });
 
-            // Guest list for this table
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            sortedGuests.forEach((guest, guestIndex) => {
-                if (currentY + rowHeight > pageHeight) {
+            children.sort((a, b) => {
+                const lastNameA = (a.lastName || '').toLowerCase();
+                const lastNameB = (b.lastName || '').toLowerCase();
+                return lastNameA.localeCompare(lastNameB);
+            });
+
+            const addGuestRows = (guestList) => {
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                guestList.forEach((guest, guestIndex) => {
+                    if (currentY + rowHeight > pageHeight) {
+                        doc.addPage();
+                        currentY = 20;
+                    }
+                    
+                    const guestName = `${guestIndex + 1}. ${guest.firstName || ''} ${guest.lastName || ''}`;
+                    doc.text(guestName, 15, currentY);
+                    currentY += rowHeight;
+                });
+            };
+
+            addGuestRows(adults);
+
+            if (children.length > 0) {
+                if (currentY + rowHeight * 2 > pageHeight) {
                     doc.addPage();
                     currentY = 20;
                 }
-                
-                const guestName = `${guestIndex + 1}. ${guest.firstName || ''} ${guest.lastName || ''}`;
-                doc.text(guestName, 15, currentY);
-                currentY += rowHeight;
-            });
+                currentY += 5;
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text(t('children') || 'Children', 15, currentY);
+                currentY += 8;
+                addGuestRows(children);
+            }
 
             currentY += marginBetweenTables;
         });
@@ -622,9 +672,13 @@ const saveArrangement = async () => {
                     g.id === originalId || g.originalGuestId === originalId
                 );
                 
+                const childCount = relatedGuests.filter(g => g.isChild).length;
+                const adultCount = relatedGuests.length - childCount;
+
                 guestTicketMap.set(originalId, {
                     fullName: `${originalGuest.firstName} ${originalGuest.lastName}`,
-                    ticketCount: relatedGuests.length
+                    ticketCount: adultCount,
+                    childCount: childCount
                 });
             }
         });
@@ -637,7 +691,8 @@ const saveArrangement = async () => {
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('Guest Name', 20, 70);
-        doc.text('Tickets', 150, 70);
+        doc.text('Adults', 130, 70);
+        doc.text('Children', 160, 70);
         
         // Draw header line
         doc.line(20, 72, 190, 72);
@@ -646,6 +701,7 @@ const saveArrangement = async () => {
         doc.setFont(undefined, 'normal');
         let yPosition = 80;
         let totalTickets = 0;
+        let totalChildren = 0;
         
         guestTicketList.forEach((guest, index) => {
             // Check if we need a new page
@@ -656,15 +712,18 @@ const saveArrangement = async () => {
                 // Repeat headers on new page
                 doc.setFont(undefined, 'bold');
                 doc.text('Guest Name', 20, yPosition);
-                doc.text('Tickets', 150, yPosition);
+                doc.text('Adults', 130, yPosition);
+                doc.text('Children', 160, yPosition);
                 doc.line(20, yPosition + 2, 190, yPosition + 2);
                 doc.setFont(undefined, 'normal');
                 yPosition += 10;
             }
             
             doc.text(guest.fullName, 20, yPosition);
-            doc.text(guest.ticketCount.toString(), 150, yPosition);
+            doc.text(guest.ticketCount.toString(), 130, yPosition);
+            doc.text(guest.childCount > 0 ? guest.childCount.toString() : '', 160, yPosition);
             totalTickets += guest.ticketCount;
+            totalChildren += guest.childCount;
             yPosition += 7;
         });
         
@@ -675,8 +734,10 @@ const saveArrangement = async () => {
         doc.setFont(undefined, 'bold');
         doc.text('Total Guests:', 20, yPosition);
         doc.text(guestTicketList.length.toString(), 80, yPosition);
-        doc.text('Total Tickets:', 120, yPosition);
-        doc.text(totalTickets.toString(), 150, yPosition);
+        doc.text('Total Adults:', 100, yPosition);
+        doc.text(totalTickets.toString(), 130, yPosition);
+        doc.text('Total Children:', 150, yPosition);
+        doc.text(totalChildren.toString(), 180, yPosition);
         
         doc.save(`${weddingId || 'wedding'}_guest_tickets.pdf`);
         
@@ -691,105 +752,60 @@ const saveArrangement = async () => {
 
         // Title
         doc.setFontSize(18);
-        doc.text(t('guestTicketListByGroup') || 'Guest Tickets by Group', 20, 20);
+        doc.text(t('guestTicketsByGroup'), 20, 20);
 
         // Wedding name if available
         if (weddingId) {
             doc.setFontSize(14);
-            doc.text(`${t('wedding') || 'Wedding'}: ${weddingId}`, 20, 35);
+            doc.text(`${t('wedding')}: ${weddingId}`, 20, 35);
         }
 
         // Date
         doc.setFontSize(12);
-        doc.text(`${t('generated') || 'Generated'}: ${new Date().toLocaleDateString()}`, 20, 50);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 50);
 
-        // Build dataset from guest list and tables
         const allGuests = [...guestList, ...tables.flat()];
+        const guestGroupMap = new Map();
 
-        // Map originalId -> ticket count and original guest info
-        const originalMap = new Map();
-        allGuests.forEach(g => {
-            const originalId = g.originalGuestId || g.id;
-            if (!originalMap.has(originalId)) {
-                const originalGuest = allGuests.find(x => x.id === originalId) || g;
-                const relatedGuests = allGuests.filter(x => x.id === originalId || x.originalGuestId === originalId);
-                originalMap.set(originalId, {
-                    fullName: `${originalGuest.firstName || ''} ${originalGuest.lastName || ''}`.trim(),
-                    group: originalGuest.group || t('ungrouped') || 'Ungrouped',
-                    ticketCount: relatedGuests.length
-                });
+        allGuests.forEach(guest => {
+            if (guest.group) {
+                if (!guestGroupMap.has(guest.group)) {
+                    guestGroupMap.set(guest.group, []);
+                }
+                guestGroupMap.get(guest.group).push(guest);
             }
         });
 
-        // Group by group name
-        const groups = new Map();
-        for (const entry of originalMap.values()) {
-            if (!groups.has(entry.group)) groups.set(entry.group, []);
-            groups.get(entry.group).push({ fullName: entry.fullName, ticketCount: entry.ticketCount });
-        }
+        let yPosition = 70;
 
-        // Sort groups and entries
-        const sortedGroupNames = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b));
-        sortedGroupNames.forEach(groupName => {
-            groups.get(groupName).sort((a, b) => a.fullName.localeCompare(b.fullName));
-        });
+        // Sort groups by name
+        const sortedGroups = Array.from(guestGroupMap.keys()).sort();
 
-        // Render
-        let y = 70;
-        const pageHeight = 280;
-        const rowHeight = 7;
+        sortedGroups.forEach(groupName => {
+            const groupGuests = guestGroupMap.get(groupName);
+            const adultCount = groupGuests.filter(g => !g.isChild).length;
+            const childCount = groupGuests.filter(g => g.isChild).length;
 
-        sortedGroupNames.forEach(groupName => {
-            const list = groups.get(groupName);
-            const totalTickets = list.reduce((s, g) => s + g.ticketCount, 0);
+            if (yPosition > 260) {
+                doc.addPage();
+                yPosition = 20;
+            }
 
-            // Add page if near bottom
-            if (y + 20 > pageHeight) { doc.addPage(); y = 20; }
-
-            // Group header
             doc.setFontSize(14);
             doc.setFont(undefined, 'bold');
-            doc.text(`${t('group') || 'Group'}: ${groupName}`, 20, y);
-            y += 8;
-            doc.setFontSize(11);
+            doc.text(groupName, 20, yPosition);
+            yPosition += 8;
+
+            doc.setFontSize(12);
             doc.setFont(undefined, 'normal');
-            doc.text(`${t('total') || 'Total'} ${t('tickets') || 'Tickets'}: ${totalTickets}  |  ${t('guests') || 'Guests'}: ${list.length}`, 20, y);
-            y += 6;
-
-            // Header row
-            doc.setFont(undefined, 'bold');
-            doc.text(t('guestName') || 'Guest Name', 20, y);
-            doc.text(t('tickets') || 'Tickets', 160, y);
-            doc.line(20, y + 2, 190, y + 2);
-            y += 8;
-            doc.setFont(undefined, 'normal');
-
-            list.forEach(item => {
-                if (y + rowHeight > pageHeight) {
-                    doc.addPage();
-                    y = 20;
-                    // repeat header on new page
-                    doc.setFont(undefined, 'bold');
-                    doc.text(`${t('group') || 'Group'}: ${groupName}`, 20, y);
-                    y += 8;
-                    doc.setFont(undefined, 'bold');
-                    doc.text(t('guestName') || 'Guest Name', 20, y);
-                    doc.text(t('tickets') || 'Tickets', 160, y);
-                    doc.line(20, y + 2, 190, y + 2);
-                    y += 8;
-                    doc.setFont(undefined, 'normal');
-                }
-                doc.text(item.fullName, 20, y);
-                doc.text(String(item.ticketCount), 160, y);
-                y += rowHeight;
-            });
-
-            y += 6; // space between groups
+            doc.text(`${t('adults')}: ${adultCount}`, 25, yPosition);
+            doc.text(`${t('children')}: ${childCount > 0 ? childCount : ''}`, 75, yPosition);
+            yPosition += 10;
         });
 
-        doc.save(`${weddingId || 'wedding'}_tickets_by_group.pdf`);
+        doc.save(`${weddingId || 'wedding'}_guest_tickets_by_group.pdf`);
 
-        setAlertMessage(t('guestTicketsByGroupExported') || 'Guest tickets by group exported');
+        setAlertMessage(t('guestTicketsByGroupExported'));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -1032,6 +1048,23 @@ const saveArrangement = async () => {
         setHasUnsavedChanges(true);
     };
 
+    const handleAddChild = (guest) => {
+        saveStateToHistory(`Added child for ${guest.firstName} ${guest.lastName}`);
+        setGuestList(prevGuestList => [
+            ...prevGuestList,
+            {
+                firstName: `${guest.firstName} ${guest.lastName}'s`,
+                lastName: `child`,
+                group: guest.group,
+                originalGuestId: guest.id,
+                id: `${guest.id}-child-${Date.now()}`,
+                isChild: true
+            },
+        ]);
+        updateTables(guestList.length + 1);
+        setHasUnsavedChanges(true);
+    };
+
     const handleSelectGuest = (guestId) => {
         setSelectedGuests(prevSelected => {
             const updatedSelected = new Set(prevSelected);
@@ -1091,6 +1124,13 @@ const saveArrangement = async () => {
         const primary = [...guestList, ...tables.flat()].find(g => g.id === originalId);
         if (primary) {
             handleAddPlusOne(primary);
+        }
+    };
+
+    const handleManagerAddChild = (originalId) => {
+        const primary = [...guestList, ...tables.flat()].find(g => g.id === originalId);
+        if (primary) {
+            handleAddChild(primary);
         }
     };
 
@@ -1653,6 +1693,17 @@ const saveArrangement = async () => {
                                                 <Icon>exposure_plus_1</Icon>
                                             </Button>
                                         )}
+                                        {canAddPlusOne(guest.id) && (
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                onClick={() => handleAddChild(guest)}
+                                                style={{ marginLeft: '10px' }}
+                                                className=''
+                                            >
+                                                <Icon>child_friendly</Icon>
+                                            </Button>
+                                        )}
                                         <IconButton
                                             onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
                                             color="primary"
@@ -1661,7 +1712,6 @@ const saveArrangement = async () => {
                                         >
                                             <Icon>edit</Icon>
                                         </IconButton>
-                                        
                                     </div>
                                 </div>
                                 {/* "+1" guests */}
@@ -1751,6 +1801,14 @@ const saveArrangement = async () => {
                                                 <Icon>exposure_plus_1</Icon>
                                             </Button>
                                 )}
+                                <IconButton
+                                    onClick={() => handleAddChild(guest)}
+                                    color="primary"
+                                    size="small"
+                                    title="Add Child"
+                                >
+                                    <ChildFriendlyIcon />
+                                </IconButton>
                                 <IconButton
                                     onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
                                     color="primary"
@@ -2015,6 +2073,7 @@ const saveArrangement = async () => {
                 currentLanguage={currentLanguage}
                 allGuests={[...guestList, ...tables.flat()]}
                 onAddPlusOne={handleManagerAddPlusOne}
+                onAddChild={handleManagerAddChild}
                 onRenameGuest={handleManagerRenameGuest}
                 onDeleteGuest={handleManagerDeleteGuest}
                 onAddGuest={handleManagerAddGuest}
