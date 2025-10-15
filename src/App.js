@@ -2,6 +2,8 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import EditableList from './components/buttonAddWedding/EditableList';
 import './App.css';
 import SeatingCanvas from './components/SeatingCanvas';
+import Login from './components/Login';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const redirectToHome = () => {
         window.location.href = '/';
@@ -16,9 +18,17 @@ function App() {
         </header>
 
         <Routes>
-          <Route path="/" element={<EditableList />} />
-
-          <Route path="/wedding/:name" element={<SeatingCanvas />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={
+            <ProtectedRoute>
+              <EditableList />
+            </ProtectedRoute>
+          } />
+          <Route path="/wedding/:name" element={
+            <ProtectedRoute>
+              <SeatingCanvas />
+            </ProtectedRoute>
+          } />
         </Routes>
       </div>
     </BrowserRouter>

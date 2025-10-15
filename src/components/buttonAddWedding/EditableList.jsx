@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAuth } from 'react-oidc-context';
 import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
@@ -12,6 +13,8 @@ import ListItemText from '@mui/material/ListItemText';
 import ListItem from '@mui/material/ListItem';
 
 function EditableList() {
+    const auth = useAuth();
+    const userName = auth.user?.profile?.name || auth.user?.profile?.email || 'User';
     const [inputValue, setInputValue] = useState('');
     const [items, setItems] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null);
@@ -248,6 +251,11 @@ function EditableList() {
 
     return (
         <div>
+            {/* Top Bar */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#f5f5f5', padding: '10px 20px', marginBottom: '20px', borderBottom: '1px solid #ddd' }}>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>Hi {userName}!</div>
+                <button onClick={() => auth.signoutRedirect()} style={{ padding: '8px 16px', background: '#d32f2f', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Log out</button>
+            </div>
             <div className="inputWrapper">
                 <TextField
                     id="standard-basic"
