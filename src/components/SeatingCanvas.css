@@ -1,7 +1,4 @@
-.save-button{
-    background-color: var(--button-save-color) !important;
-    color: var(--button-save-font-color) !important;
-}
+
 .plus-one-button{
     background-color: var(--button-plus-one-color) !important;
     color: var(--button-plus-one-font-color) !important;
@@ -17,6 +14,13 @@
 .switch-button {
     background-color: var(--button-switch-color) !important;
     color: var(--button-switch-font-color) !important;
+}
+    
+
+/* Loading spinner animation */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 .plus-one-label{

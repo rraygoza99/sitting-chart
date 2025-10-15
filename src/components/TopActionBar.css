@@ -1,0 +1,108 @@
+.top-action-bar {
+    position: sticky;
+    top: 0;
+    background-color: #ffffff;
+    border-bottom: 1px solid #e0e0e0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.top-action-bar-content {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    max-width: 100%;
+    margin: 0 auto;
+    gap: 0;
+}
+
+.top-action-bar-left {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 400px;
+    max-width: 500px;
+    padding: 0 15px;
+    background-color: #ffffff;
+    border-right: 2px solid #ddd;
+}
+
+.top-action-bar-center {
+    display: none; /* Not used in the new layout */
+}
+
+.top-action-bar-right {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex: 1;
+    gap: 12px;
+    padding: 0 24px;
+}
+.top-action-bar .home-button{
+    background-color: #582f5fff;
+}
+
+.top-action-bar .save-button {
+    font-weight: 600;
+    padding: 8px 24px;
+    border-radius: 8px;
+    text-transform: none;
+    box-shadow: 0 2px 4px rgba(25, 118, 210, 0.3);
+    transition: all 0.2s ease;
+    background-color: var(--button-save-color);
+    color: var(--button-save-font-color);
+}
+
+.top-action-bar .save-button:hover {
+    box-shadow: 0 4px 8px rgba(25, 118, 210, 0.4);
+    transform: translateY(-1px);
+}
+
+.top-action-bar .save-button:disabled {
+    box-shadow: none;
+    transform: none;
+    background-color: #e0e0e0;
+}
+
+.top-action-bar .export-button {
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 8px;
+    text-transform: none;
+    transition: all 0.2s ease;
+}
+
+.top-action-bar .export-button:hover {
+    transform: translateY(-1px);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .top-action-bar-content {
+        flex-direction: column;
+        padding: 8px 0;
+        gap: 8px;
+    }
+    
+    .top-action-bar-left {
+        min-width: 100%;
+        max-width: 100%;
+        border-right: none;
+        border-bottom: 2px solid #ddd;
+        padding: 8px 16px;
+    }
+    
+    .top-action-bar-right {
+        width: 100%;
+        justify-content: center;
+        padding: 8px 16px;
+    }
+    
+    .top-action-bar .save-button {
+        width: auto;
+        max-width: 200px;
+    }
+}

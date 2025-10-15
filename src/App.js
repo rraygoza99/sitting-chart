@@ -5,18 +5,11 @@ import SeatingCanvas from './components/SeatingCanvas';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 
-const redirectToHome = () => {
-        window.location.href = '/';
-    }
 function App() {
     
   return (
     <BrowserRouter>
       <div className="App">
-        <header className="App-header">
-          <h1 onClick={redirectToHome} style={{cursor: 'pointer'}} >Wedding Seating Arrangement</h1>
-        </header>
-
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/" element={
@@ -34,7 +27,5 @@ function App() {
     </BrowserRouter>
   );
 }
-
-
 
 export default App;

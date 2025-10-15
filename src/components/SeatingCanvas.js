@@ -5,11 +5,12 @@ import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
 import Alert from '@mui/material/Alert';
 import Snackbar from '@mui/material/Snackbar';
-import ExposurePlus1Icon from '@mui/icons-material/Exposure';
 import Icon from '@mui/material/Icon';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import TableBarIcon from '@mui/icons-material/TableBar';
 import Modal from '@mui/material/Modal';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -22,7 +23,14 @@ import Popper from '@mui/material/Popper';
 import MenuItem from '@mui/material/MenuItem';
 import MenuList from '@mui/material/MenuList';
 import ConfigurationModal from './ConfigurationModal';
+import TopActionBar from './TopActionBar';
+import ContextMenu from './ContextMenu';
+import TableList from './TableList';
+import GuestManagerModal from './GuestManagerModal';
+import GroupIcon from '@mui/icons-material/Group';
+import ChildFriendlyIcon from '@mui/icons-material/ChildFriendly';
 import './SeatingCanvas.css';
+import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 function SeatingCanvas({ guests = [] }) {
     const { name: weddingId } = useParams();
@@ -40,7 +48,6 @@ function SeatingCanvas({ guests = [] }) {
     const [editLastName, setEditLastName] = useState('');
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
     const [isDragOverGuestList, setIsDragOverGuestList] = useState(false);
-    const [showGroupSubmenu, setShowGroupSubmenu] = useState(false);
     const [showNewGroupModal, setShowNewGroupModal] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [editingTable, setEditingTable] = useState(null);
@@ -48,13 +55,77 @@ function SeatingCanvas({ guests = [] }) {
     const [tableSizes, setTableSizes] = useState({});
     const [tableNumbers, setTableNumbers] = useState({}); // Custom table numbers for PDF export
     const [showAddGuestsModal, setShowAddGuestsModal] = useState(false);
+    const [showGuestManager, setShowGuestManager] = useState(false);
     const [newGuestsData, setNewGuestsData] = useState([]);
     const [collapsedGroups, setCollapsedGroups] = useState(new Set()); // Track collapsed groups
+        const [customGroups, setCustomGroups] = useState([]); // Persisted custom groups (can be empty)
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
+    const [currentLanguage, setCurrentLanguage] = useState('english'); // Language state
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track unsaved changes
+    const [isLoading, setIsLoading] = useState(false); // Loading state for server operations
     
-    // Split button state for PDF export
-    const [exportMenuOpen, setExportMenuOpen] = useState(false);
-    const exportAnchorRef = useRef(null);
+    // Split button state for Add actions
+    const [addMenuOpen, setAddMenuOpen] = useState(false);
+    
+    // Undo system state
+    const [undoHistory, setUndoHistory] = useState([]);
+    const MAX_UNDO_HISTORY = 10;
+    const addAnchorRef = useRef(null);
+    
+    // Translation hook
+    const { t } = useSeatingTranslation(currentLanguage);
+
+    // API endpoint for S3 operations
+    const S3_API_BASE = "https://q5c7u5zmzc4l7r4warc6oslx4e0bgoqd.lambda-url.us-east-2.on.aws/api/s3";
+
+    // Load wedding data from S3
+    const loadWeddingFromServer = async (weddingName) => {
+        setIsLoading(true);
+        try {
+            const response = await fetch(`${S3_API_BASE}/file/${weddingName}.json`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Error loading wedding from server:', error);
+            return null;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Save wedding data to S3
+    const saveWeddingToServer = async (weddingName, weddingData) => {
+        setIsLoading(true);
+        try {
+            // Create a JSON blob as a file
+            const jsonBlob = new Blob([JSON.stringify(weddingData)], { 
+                type: 'application/json' 
+            });
+            
+            // Create form data with the file
+            const formData = new FormData();
+            formData.append('file', jsonBlob, `${weddingName}.json`);
+            
+            const response = await fetch(`${S3_API_BASE}/upload`, {
+                method: 'POST',
+                body: formData // Don't set Content-Type header, let browser set it for FormData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error saving wedding to server:', error);
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     // Function to get the configured table size
     const getTableSize = useCallback(() => {
@@ -71,41 +142,118 @@ function SeatingCanvas({ guests = [] }) {
     }, []);
 
     const handleCloseAlert = () => setAlertOpen(false);
-    const getStorageKey = useCallback(() => `weddingArrangement-${weddingId || 'default'}`, [weddingId]);    useEffect(() => {
-        const storageKey = `weddingArrangement-${weddingId || 'default'}`;
-        const savedData = localStorage.getItem(storageKey);
-        if (savedData) {
-            try {
+    
+    // Load wedding data from server
+    useEffect(() => {
+        const loadWeddingData = async () => {
+            if (!weddingId) {
+                // Handle case where there's no wedding ID
+                const initialGuestList = guests.map((guest, index) => ({
+                    ...guest,
+                    id: guest.id || `guest-${Date.now()}-${index}`,
+                }));
+                setGuestList(initialGuestList);
+                const totalGuests = guests.length;
+                const tableSize = getTableSize();
+                const requiredTables = Math.ceil(Math.max(totalGuests, 1) / tableSize);
+                setTables(Array(requiredTables).fill([]));
+                return;
+            }
+
+            // Try to load from server first
+            const serverData = await loadWeddingFromServer(weddingId);
+            
+            if (serverData) {
+                // Successfully loaded from server
+                // The server returns data with a nested structure: { content: { actualData } }
+                const contentData = serverData.content || serverData; // Handle both nested and flat structures
+                
+                // Handle both formats: direct properties (guestList, tables) and saved format (savedGuestList, savedTables)
                 const { 
+                    guestList: directGuestList,
+                    tables: directTables,
+                    tableAliases: directTableAliases,
+                    tableSizes: directTableSizes,
+                    tableNumbers: directTableNumbers,
+                        customGroups: directCustomGroups,
                     savedGuestList, 
                     savedTables, 
-                    savedTableAliases = {}, 
-                    savedTableSizes = {}, 
-                    savedTableNumbers = {} 
-                } = JSON.parse(savedData);
-                setGuestList(savedGuestList || []);
-                setTables(savedTables || []);
-                setTableAliases(savedTableAliases);
-                setTableSizes(savedTableSizes);
-                setTableNumbers(savedTableNumbers);
-            } catch (error) {
-                console.error('Error parsing saved data:', error);
-                setGuestList([]);
-                setTables([]);
+                    savedTableAliases, 
+                    savedTableSizes, 
+                    savedTableNumbers,
+                    savedCustomGroups 
+                } = contentData;
+                
+                // Use saved format if available, otherwise use direct format
+                const loadedGuestList = savedGuestList || directGuestList || [];
+                const loadedTables = savedTables || directTables || [];
+                const loadedTableAliases = savedTableAliases || directTableAliases || {};
+                const loadedTableSizes = savedTableSizes || directTableSizes || {};
+                const loadedTableNumbers = savedTableNumbers || directTableNumbers || {};
+                const loadedCustomGroups = savedCustomGroups || directCustomGroups || [];
+                
+                // Ensure loadedTables is an array of arrays, handling both formats:
+                // Format 1: Array of arrays (legacy format) - [[guest1, guest2], [guest3]]
+                // Format 2: Array of table objects (server format) - [{tableNumber: 1, guests: [guest1, guest2]}]
+                let safeTables;
+                if (Array.isArray(loadedTables)) {
+                    safeTables = loadedTables.map(table => {
+                        if (Array.isArray(table)) {
+                            // Legacy format: table is already an array of guests
+                            return table;
+                        } else if (table && typeof table === 'object' && Array.isArray(table.guests)) {
+                            // Server format: table is an object with a guests property
+                            return table.guests;
+                        } else {
+                            // Invalid format, return empty array
+                            return [];
+                        }
+                    });
+                } else {
+                    safeTables = [];
+                }
+                
+                setGuestList(loadedGuestList);
+                setTableAliases(loadedTableAliases);
+                setTableSizes(loadedTableSizes);
+                setTableNumbers(loadedTableNumbers);
+                setCustomGroups(Array.isArray(loadedCustomGroups) ? loadedCustomGroups : []);
+                
+                // Check if we have guests but no tables (e.g., CSV import from home page)
+                if (loadedGuestList.length > 0 && safeTables.length === 0) {
+                    const tableSize = getTableSize();
+                    const requiredTables = Math.ceil(loadedGuestList.length / tableSize);
+                    setTables(Array(requiredTables).fill([]));
+                } else {
+                    setTables(safeTables);
+                }
+                
+                // No unsaved changes when loading from server
+                setHasUnsavedChanges(false);
+            } else {
+                // Server failed to load data - show error message
+                setAlertMessage('Failed to load wedding data from server. Please check your connection and try again.');
+                setAlertSeverity('error');
+                setAlertOpen(true);
+                
+                // Initialize with empty state
+                const initialGuestList = guests.map((guest, index) => ({
+                    ...guest,
+                    id: guest.id || `guest-${Date.now()}-${index}`,
+                }));
+                setGuestList(initialGuestList);
+                const totalGuests = guests.length;
+                const tableSize = getTableSize();
+                const requiredTables = Math.ceil(totalGuests / tableSize);
+                setTables(Array(requiredTables).fill([]));
                 setTableAliases({});
                 setTableSizes({});
                 setTableNumbers({});
+                setHasUnsavedChanges(false);
             }
-        } else {
-            const initialGuestList = guests.map((guest, index) => ({
-                ...guest,
-                id: guest.id || `guest-${Date.now()}-${index}`,
-            }));
-            setGuestList(initialGuestList);
-            const totalGuests = guests.length;
-            const tableSize = getTableSize();
-            const requiredTables = Math.ceil(Math.max(totalGuests, 1) / tableSize);
-            setTables(Array(requiredTables).fill([]));        }
+        };
+
+        loadWeddingData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [weddingId]);
     useEffect(() => {
@@ -115,6 +263,19 @@ function SeatingCanvas({ guests = [] }) {
                 id: guest.id || `guest-${Date.now()}-${index}`,
             }));
             setGuestList(initialGuestList);
+        }
+        
+        // Load language preference
+        const savedConfig = localStorage.getItem('seatingConfiguration');
+        if (savedConfig) {
+            try {
+                const config = JSON.parse(savedConfig);
+                if (config.language) {
+                    setCurrentLanguage(config.language);
+                }
+            } catch (error) {
+                console.error('Error loading language preference:', error);
+            }
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -141,26 +302,102 @@ function SeatingCanvas({ guests = [] }) {
 
         updateTables(guestList.length + newGuests.length);
         
-        setAlertMessage(`Successfully imported ${newGuests.length} guests!`);
+        setAlertMessage(t('importSuccessful', { count: newGuests.length }));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
 
 const saveArrangement = async () => {
+        if (!weddingId) {
+            setAlertMessage('Cannot save: No wedding ID provided');
+            setAlertSeverity('error');
+            setAlertOpen(true);
+            return;
+        }
+
         const dataToSave = {
-            savedGuestList: guestList,
-            savedTables: tables,
-            savedTableAliases: tableAliases,
-            savedTableSizes: tableSizes,
-            savedTableNumbers: tableNumbers
+            weddingName: weddingId,
+            exportDate: new Date().toISOString(),
+            totalGuests: guestList.length,
+            totalTables: tables.length,
+            guestList: guestList,
+            tables: tables,
+            tableAliases: tableAliases,
+            tableSizes: tableSizes,
+            tableNumbers: tableNumbers,
+            customGroups: customGroups,
+            metadata: {
+                viewMode: viewMode,
+                isGrouped: isGrouped,
+                version: "1.0"
+            }
         };
-        localStorage.setItem(getStorageKey(), JSON.stringify(dataToSave));
         
-        setAlertMessage('Arrangement saved successfully!');
-        setAlertSeverity('success');
+        // Save to server
+        const success = await saveWeddingToServer(weddingId, dataToSave);
+        
+        if (success) {
+            // Reset unsaved changes flag after successful save
+            setHasUnsavedChanges(false);
+            
+            setAlertMessage(t('arrangementSaved'));
+            setAlertSeverity('success');
+            setAlertOpen(true);
+        } else {
+            setAlertMessage('Failed to save to server. Please check your connection and try again.');
+            setAlertSeverity('error');
+            setAlertOpen(true);
+        }
+    };
+
+    // Undo system functions
+    const saveStateToHistory = (actionDescription) => {
+        const currentState = {
+            guestList: [...guestList],
+            tables: tables.map(table => [...table]),
+            tableAliases: { ...tableAliases },
+            tableSizes: { ...tableSizes },
+            tableNumbers: { ...tableNumbers },
+            timestamp: Date.now(),
+            action: actionDescription
+        };
+
+        setUndoHistory(prevHistory => {
+            const newHistory = [currentState, ...prevHistory];
+            return newHistory.slice(0, MAX_UNDO_HISTORY);
+        });
+        
+        // Mark as having unsaved changes when an action occurs
+        setHasUnsavedChanges(true);
+    };
+
+    const performUndo = () => {
+        if (undoHistory.length === 0) {
+            setAlertMessage(t('noActionsToUndo'));
+            setAlertSeverity('info');
+            setAlertOpen(true);
+            return;
+        }
+
+        const [lastState, ...remainingHistory] = undoHistory;
+        
+        setGuestList(lastState.guestList);
+        setTables(lastState.tables);
+        setTableAliases(lastState.tableAliases);
+        setTableSizes(lastState.tableSizes);
+        setTableNumbers(lastState.tableNumbers);
+        setUndoHistory(remainingHistory);
+        
+        // Mark as having unsaved changes when undoing
+        setHasUnsavedChanges(true);
+
+        setAlertMessage(t('undoAction', { action: lastState.action }));
+        setAlertSeverity('info');
         setAlertOpen(true);
-    };const deleteArrangement = () => {
-        localStorage.removeItem(getStorageKey());
+    };
+
+    const deleteArrangement = () => {
+        // Reset to initial state
         const initialGuestList = guests.map((guest, index) => ({ ...guest, id: `guest-${index}` }));
         setGuestList(initialGuestList.sort((a, b) => a.firstName.localeCompare(b.firstName)));
         const totalGuests = guests.length;
@@ -170,13 +407,14 @@ const saveArrangement = async () => {
         setTableAliases({}); // Reset table aliases
         setTableSizes({}); // Reset table sizes
         setTableNumbers({}); // Reset table numbers
-        setAlertMessage('Arrangement deleted successfully!');
+    setCustomGroups([]); // Reset custom groups
+        setAlertMessage(t('arrangementDeleted'));
         setAlertSeverity('warning');
         setAlertOpen(true);
     };    const exportToPDF = () => {
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text('Wedding Seating Arrangement', 10, 10);
+        doc.text(t('weddingSeatingArrangement'), 10, 10);
 
         const allGuests = [];
         tables.forEach((table, tableIndex) => {
@@ -188,7 +426,16 @@ const saveArrangement = async () => {
             });
         });
 
-        allGuests.sort((a, b) => {
+        const adults = allGuests.filter(g => !g.isChild);
+        const children = allGuests.filter(g => g.isChild);
+
+        adults.sort((a, b) => {
+            const lastNameA = (a.lastName || '').toLowerCase();
+            const lastNameB = (b.lastName || '').toLowerCase();
+            return lastNameA.localeCompare(lastNameB);
+        });
+
+        children.sort((a, b) => {
             const lastNameA = (a.lastName || '').toLowerCase();
             const lastNameB = (b.lastName || '').toLowerCase();
             return lastNameA.localeCompare(lastNameB);
@@ -199,35 +446,50 @@ const saveArrangement = async () => {
         const rowHeight = 8;
         const columnWidths = [60, 60, 30];
 
-        doc.setFontSize(12);
-        doc.setFont(undefined, 'bold');
-        doc.text('Last Name', 10, currentY);
-        doc.text('First Name', 10 + columnWidths[0], currentY);
-        doc.text('Table #', 10 + columnWidths[0] + columnWidths[1], currentY);
-        
-        doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
-        currentY += 10;
+        const addHeader = () => {
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'bold');
+            doc.text(t('lastName'), 10, currentY);
+            doc.text(t('firstName'), 10 + columnWidths[0], currentY);
+            doc.text(t('tableNumber'), 10 + columnWidths[0] + columnWidths[1], currentY);
+            
+            doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
+            currentY += 10;
+            doc.setFont(undefined, 'normal');
+        };
 
-        doc.setFont(undefined, 'normal');
-        allGuests.forEach((guest) => {
-            if (currentY + rowHeight > pageHeight) {
+        addHeader();
+
+        const addGuestRows = (guestList) => {
+            guestList.forEach((guest) => {
+                if (currentY + rowHeight > pageHeight) {
+                    doc.addPage();
+                    currentY = 20;
+                    addHeader();
+                }
+
+                doc.text(guest.lastName || '', 10, currentY);
+                doc.text(guest.firstName || '', 10 + columnWidths[0], currentY);
+                doc.text(guest.tableNumber.toString(), 10 + columnWidths[0] + columnWidths[1], currentY);
+                currentY += rowHeight;
+            });
+        };
+
+        addGuestRows(adults);
+
+        if (children.length > 0) {
+            if (currentY + rowHeight * 2 > pageHeight) {
                 doc.addPage();
                 currentY = 20;
-                
-                doc.setFont(undefined, 'bold');
-                doc.text('Last Name', 10, currentY);
-                doc.text('First Name', 10 + columnWidths[0], currentY);
-                doc.text('Table #', 10 + columnWidths[0] + columnWidths[1], currentY);
-                doc.line(10, currentY + 2, 10 + columnWidths[0] + columnWidths[1] + columnWidths[2], currentY + 2);
-                currentY += 10;
-                doc.setFont(undefined, 'normal');
             }
-
-            doc.text(guest.lastName || '', 10, currentY);
-            doc.text(guest.firstName || '', 10 + columnWidths[0], currentY);
-            doc.text(guest.tableNumber.toString(), 10 + columnWidths[0] + columnWidths[1], currentY);
-            currentY += rowHeight;
-        });
+            currentY += 10;
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(t('children') || 'Children', 10, currentY);
+            currentY += 10;
+            addHeader();
+            addGuestRows(children);
+        }
 
         doc.save('Wedding_Seating_Arrangement.pdf');
     };
@@ -235,7 +497,7 @@ const saveArrangement = async () => {
     const exportToPDFGroupedByTables = () => {
         const doc = new jsPDF();
         doc.setFontSize(16);
-        doc.text('Wedding Seating Arrangement - Grouped by Tables', 10, 10);
+        doc.text(t('weddingSeatingArrangementGrouped'), 10, 10);
 
         let currentY = 30;
         const pageHeight = 280;
@@ -266,26 +528,51 @@ const saveArrangement = async () => {
             
             currentY += tableHeaderHeight + 5;
 
+            const adults = table.filter(g => !g.isChild);
+            const children = table.filter(g => g.isChild);
+
             // Sort guests by last name
-            const sortedGuests = [...table].sort((a, b) => {
+            adults.sort((a, b) => {
                 const lastNameA = (a.lastName || '').toLowerCase();
                 const lastNameB = (b.lastName || '').toLowerCase();
                 return lastNameA.localeCompare(lastNameB);
             });
 
-            // Guest list for this table
-            doc.setFontSize(10);
-            doc.setFont(undefined, 'normal');
-            sortedGuests.forEach((guest, guestIndex) => {
-                if (currentY + rowHeight > pageHeight) {
+            children.sort((a, b) => {
+                const lastNameA = (a.lastName || '').toLowerCase();
+                const lastNameB = (b.lastName || '').toLowerCase();
+                return lastNameA.localeCompare(lastNameB);
+            });
+
+            const addGuestRows = (guestList) => {
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'normal');
+                guestList.forEach((guest, guestIndex) => {
+                    if (currentY + rowHeight > pageHeight) {
+                        doc.addPage();
+                        currentY = 20;
+                    }
+                    
+                    const guestName = `${guestIndex + 1}. ${guest.firstName || ''} ${guest.lastName || ''}`;
+                    doc.text(guestName, 15, currentY);
+                    currentY += rowHeight;
+                });
+            };
+
+            addGuestRows(adults);
+
+            if (children.length > 0) {
+                if (currentY + rowHeight * 2 > pageHeight) {
                     doc.addPage();
                     currentY = 20;
                 }
-                
-                const guestName = `${guestIndex + 1}. ${guest.firstName || ''} ${guest.lastName || ''}`;
-                doc.text(guestName, 15, currentY);
-                currentY += rowHeight;
-            });
+                currentY += 5;
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.text(t('children') || 'Children', 15, currentY);
+                currentY += 8;
+                addGuestRows(children);
+            }
 
             currentY += marginBetweenTables;
         });
@@ -293,25 +580,25 @@ const saveArrangement = async () => {
         doc.save('Wedding_Seating_Arrangement_Grouped_by_Tables.pdf');
     };
 
-    // Split button handlers
-    const handleExportMenuToggle = () => {
-        setExportMenuOpen((prevOpen) => !prevOpen);
+    // Add button group handlers
+    const handleAddMenuToggle = () => {
+        setAddMenuOpen((prevOpen) => !prevOpen);
     };
 
-    const handleExportMenuClose = (event) => {
-        if (exportAnchorRef.current && exportAnchorRef.current.contains(event.target)) {
+    const handleAddMenuClose = (event) => {
+        if (addAnchorRef.current && addAnchorRef.current.contains(event.target)) {
             return;
         }
-        setExportMenuOpen(false);
+        setAddMenuOpen(false);
     };
 
-    const handleExportOption = (exportType) => {
-        if (exportType === 'alphabetical') {
-            exportToPDF();
-        } else if (exportType === 'grouped') {
-            exportToPDFGroupedByTables();
+    const handleAddOption = (addType) => {
+        if (addType === 'guests') {
+            openAddGuestsModal();
+        } else if (addType === 'group') {
+            openNewGroupModal();
         }
-        setExportMenuOpen(false);
+        setAddMenuOpen(false);
     };
 
     const exportToJSON = () => {
@@ -347,7 +634,7 @@ const saveArrangement = async () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        setAlertMessage('Arrangement exported to JSON successfully!');
+        setAlertMessage(t('arrangementExported'));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -357,12 +644,12 @@ const saveArrangement = async () => {
         
         // Title
         doc.setFontSize(18);
-        doc.text('Guest Ticket List', 20, 20);
+        doc.text(t('guestTicketList'), 20, 20);
         
         // Wedding name if available
         if (weddingId) {
             doc.setFontSize(14);
-            doc.text(`Wedding: ${weddingId}`, 20, 35);
+            doc.text(`${t('wedding')}: ${weddingId}`, 20, 35);
         }
         
         // Date
@@ -385,9 +672,13 @@ const saveArrangement = async () => {
                     g.id === originalId || g.originalGuestId === originalId
                 );
                 
+                const childCount = relatedGuests.filter(g => g.isChild).length;
+                const adultCount = relatedGuests.length - childCount;
+
                 guestTicketMap.set(originalId, {
                     fullName: `${originalGuest.firstName} ${originalGuest.lastName}`,
-                    ticketCount: relatedGuests.length
+                    ticketCount: adultCount,
+                    childCount: childCount
                 });
             }
         });
@@ -400,7 +691,8 @@ const saveArrangement = async () => {
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
         doc.text('Guest Name', 20, 70);
-        doc.text('Tickets', 150, 70);
+        doc.text('Adults', 130, 70);
+        doc.text('Children', 160, 70);
         
         // Draw header line
         doc.line(20, 72, 190, 72);
@@ -409,6 +701,7 @@ const saveArrangement = async () => {
         doc.setFont(undefined, 'normal');
         let yPosition = 80;
         let totalTickets = 0;
+        let totalChildren = 0;
         
         guestTicketList.forEach((guest, index) => {
             // Check if we need a new page
@@ -419,15 +712,18 @@ const saveArrangement = async () => {
                 // Repeat headers on new page
                 doc.setFont(undefined, 'bold');
                 doc.text('Guest Name', 20, yPosition);
-                doc.text('Tickets', 150, yPosition);
+                doc.text('Adults', 130, yPosition);
+                doc.text('Children', 160, yPosition);
                 doc.line(20, yPosition + 2, 190, yPosition + 2);
                 doc.setFont(undefined, 'normal');
                 yPosition += 10;
             }
             
             doc.text(guest.fullName, 20, yPosition);
-            doc.text(guest.ticketCount.toString(), 150, yPosition);
+            doc.text(guest.ticketCount.toString(), 130, yPosition);
+            doc.text(guest.childCount > 0 ? guest.childCount.toString() : '', 160, yPosition);
             totalTickets += guest.ticketCount;
+            totalChildren += guest.childCount;
             yPosition += 7;
         });
         
@@ -438,27 +734,97 @@ const saveArrangement = async () => {
         doc.setFont(undefined, 'bold');
         doc.text('Total Guests:', 20, yPosition);
         doc.text(guestTicketList.length.toString(), 80, yPosition);
-        doc.text('Total Tickets:', 120, yPosition);
-        doc.text(totalTickets.toString(), 150, yPosition);
+        doc.text('Total Adults:', 100, yPosition);
+        doc.text(totalTickets.toString(), 130, yPosition);
+        doc.text('Total Children:', 150, yPosition);
+        doc.text(totalChildren.toString(), 180, yPosition);
         
         doc.save(`${weddingId || 'wedding'}_guest_tickets.pdf`);
         
-        setAlertMessage('Guest ticket list exported to PDF successfully!');
+        setAlertMessage(t('guestTicketsExported'));
+        setAlertSeverity('success');
+        setAlertOpen(true);
+    };
+
+    // Export ticket information grouped by guest group
+    const exportGuestTicketsByGroupToPDF = () => {
+        const doc = new jsPDF();
+
+        // Title
+        doc.setFontSize(18);
+        doc.text(t('guestTicketsByGroup'), 20, 20);
+
+        // Wedding name if available
+        if (weddingId) {
+            doc.setFontSize(14);
+            doc.text(`${t('wedding')}: ${weddingId}`, 20, 35);
+        }
+
+        // Date
+        doc.setFontSize(12);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 50);
+
+        const allGuests = [...guestList, ...tables.flat()];
+        const guestGroupMap = new Map();
+
+        allGuests.forEach(guest => {
+            if (guest.group) {
+                if (!guestGroupMap.has(guest.group)) {
+                    guestGroupMap.set(guest.group, []);
+                }
+                guestGroupMap.get(guest.group).push(guest);
+            }
+        });
+
+        let yPosition = 70;
+
+        // Sort groups by name
+        const sortedGroups = Array.from(guestGroupMap.keys()).sort();
+
+        sortedGroups.forEach(groupName => {
+            const groupGuests = guestGroupMap.get(groupName);
+            const adultCount = groupGuests.filter(g => !g.isChild).length;
+            const childCount = groupGuests.filter(g => g.isChild).length;
+
+            if (yPosition > 260) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(groupName, 20, yPosition);
+            yPosition += 8;
+
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${t('adults')}: ${adultCount}`, 25, yPosition);
+            doc.text(`${t('children')}: ${childCount > 0 ? childCount : ''}`, 75, yPosition);
+            yPosition += 10;
+        });
+
+        doc.save(`${weddingId || 'wedding'}_guest_tickets_by_group.pdf`);
+
+        setAlertMessage(t('guestTicketsByGroupExported'));
         setAlertSeverity('success');
         setAlertOpen(true);
     };
 
     const downloadSampleCSV = () => {
-        // Create sample CSV data with the expected format: Firstname,Lastname,Group,ID
+        // Create sample CSV data with the expected format: Firstname,Lastname,Group (ID is optional)
         const sampleData = [
-            'John,Doe,Family,1',
-            'Jane,Doe,Family,2',
-            'Mike,Smith,Friends,3',
-            'Sarah,Johnson,Friends,4',
-            'Robert,Williams,Colleagues,5',
-            'Emily,Brown,Colleagues,6',
-            'David,Jones,Family,7',
-            'Lisa,Garcia,Friends,8'
+            'John,Doe,Family',
+            'John,Doe +1,Family',
+            'Jane,Smith,Family',
+            'Jane,Smith +1,Family',
+            'Jane,Smith +2,Family',
+            'Mike,Johnson,Friends',
+            'Sarah,Williams,Friends',
+            'Sarah,Williams +1,Friends',
+            'Robert,Brown,Colleagues',
+            'Emily,Garcia,Colleagues',
+            'David,Jones,Family',
+            'Lisa,Davis,Friends'
         ];
 
         const csvContent = sampleData.join('\n');
@@ -467,13 +833,13 @@ const saveArrangement = async () => {
         const url = URL.createObjectURL(dataBlob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'sample_guest_list.csv';
+        link.download = 'sample_guest_list_no_ids.csv';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        setAlertMessage('Sample CSV downloaded successfully!');
+        setAlertMessage(t('sampleCSVDownloaded'));
         setAlertSeverity('info');
         setAlertOpen(true);
     };
@@ -489,6 +855,13 @@ const saveArrangement = async () => {
         
         const isMultiDrag = guest.isMultiDrag;
         const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
+        
+        // Save state before making changes
+        if (isMultiDrag) {
+            saveStateToHistory(`Moved ${guestsToMove.length} guests to table ${tableIndex + 1}`);
+        } else {
+            saveStateToHistory(`Moved ${guest.firstName} ${guest.lastName} to table ${tableIndex + 1}`);
+        }
         
         setTables(prevTables => {
             const updatedTables = [...prevTables];
@@ -534,6 +907,13 @@ const saveArrangement = async () => {
             const isMultiDrag = guest.isMultiDrag;
             const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
             
+            // Save state before making changes
+            if (isMultiDrag) {
+                saveStateToHistory(`Unassigned ${guestsToMove.length} guests from tables`);
+            } else {
+                saveStateToHistory(`Unassigned ${guest.firstName} ${guest.lastName} from table ${fromTableIndex + 1}`);
+            }
+            
             // Remove from tables and add back to guest list
             setTables(prevTables => {
                 const updatedTables = [...prevTables];
@@ -569,6 +949,9 @@ const saveArrangement = async () => {
     };
 
     const handleRemove = (guest, tableIndex) => {
+        // Save state before making changes
+        saveStateToHistory(`Removed ${guest.firstName} ${guest.lastName} from table ${tableIndex + 1}`);
+        
         setTables(prevTables => {
             const updatedTables = [...prevTables];
             updatedTables[tableIndex] = updatedTables[tableIndex].filter(assigned => assigned.id !== guest.id);
@@ -580,18 +963,50 @@ const saveArrangement = async () => {
 
     // Clear all guests from a specific table
     const handleClearTable = (tableIndex) => {
+        // First, get the guests from the table that need to be moved
+        const guestsToMove = tables[tableIndex];
+        
+        if (guestsToMove.length === 0) {
+            return; // Nothing to clear
+        }
+        
+        // Save state before making changes
+        saveStateToHistory(`Cleared all ${guestsToMove.length} guests from table ${tableIndex + 1}`);
+        
+        // Clear the table
         setTables(prevTables => {
             const updatedTables = [...prevTables];
-            const guestsToMove = updatedTables[tableIndex];
-            
-            // Clear the table
             updatedTables[tableIndex] = [];
-            
-            // Add all guests back to guest list
-            setGuestList(prevGuestList => [...prevGuestList, ...guestsToMove]);
-            
             return updatedTables;
         });
+        
+        // Then add all guests back to guest list
+        setGuestList(prevGuestList => [...prevGuestList, ...guestsToMove]);
+    };
+
+    // Add a new empty table
+    const handleAddTable = () => {
+        const defaultTableSize = getTableSize();
+        
+        setTables(prevTables => [...prevTables, []]);
+        
+        // Also update table aliases, sizes, and numbers to match the new table count
+        setTableAliases(prevAliases => ({
+            ...prevAliases,
+            [tables.length]: `Table ${tables.length + 1}`
+        }));
+        
+        setTableSizes(prevSizes => ({
+            ...prevSizes,
+            [tables.length]: defaultTableSize // Use the default table size from configuration
+        }));
+        
+        setTableNumbers(prevNumbers => ({
+            ...prevNumbers,
+            [tables.length]: tables.length + 1
+        }));
+        
+        saveStateToHistory(`Added new table ${tables.length + 1}`);
     };
 
     /*const handleReassign = (guest, fromTableIndex, toTableIndex) => {
@@ -617,7 +1032,8 @@ const saveArrangement = async () => {
         return false;
     };
     const handleAddPlusOne = (guest) => {
-        
+        // Track action and mark as unsaved
+        saveStateToHistory(`Added +1 for ${guest.firstName} ${guest.lastName}`);
         setGuestList(prevGuestList => [
             ...prevGuestList,
             {
@@ -629,6 +1045,24 @@ const saveArrangement = async () => {
             },
         ]);
         updateTables(guestList.length + 1);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleAddChild = (guest) => {
+        saveStateToHistory(`Added child for ${guest.firstName} ${guest.lastName}`);
+        setGuestList(prevGuestList => [
+            ...prevGuestList,
+            {
+                firstName: `${guest.firstName} ${guest.lastName}'s`,
+                lastName: `child`,
+                group: guest.group,
+                originalGuestId: guest.id,
+                id: `${guest.id}-child-${Date.now()}`,
+                isChild: true
+            },
+        ]);
+        updateTables(guestList.length + 1);
+        setHasUnsavedChanges(true);
     };
 
     const handleSelectGuest = (guestId) => {
@@ -643,17 +1077,125 @@ const saveArrangement = async () => {
         });
     };
 
+    const handleSelectGroup = (groupName, groupGuests) => {
+        const groupGuestIds = groupGuests.map(guest => guest.id);
+        const allGroupGuestsSelected = groupGuestIds.every(id => selectedGuests.has(id));
+        
+        setSelectedGuests(prevSelected => {
+            const updatedSelected = new Set(prevSelected);
+            
+            if (allGroupGuestsSelected) {
+                // Deselect all guests in this group
+                groupGuestIds.forEach(id => updatedSelected.delete(id));
+            } else {
+                // Select all guests in this group
+                groupGuestIds.forEach(id => updatedSelected.add(id));
+            }
+            
+            return updatedSelected;
+        });
+    };
+
+    const isGroupSelected = (groupGuests) => {
+        const groupGuestIds = groupGuests.map(guest => guest.id);
+        return groupGuestIds.length > 0 && groupGuestIds.every(id => selectedGuests.has(id));
+    };
+
+    const isGroupPartiallySelected = (groupGuests) => {
+        const groupGuestIds = groupGuests.map(guest => guest.id);
+        const selectedCount = groupGuestIds.filter(id => selectedGuests.has(id)).length;
+        return selectedCount > 0 && selectedCount < groupGuestIds.length;
+    };
+
     const removeSelectedGuests = () => {
+        if (selectedGuests.size > 0) {
+            saveStateToHistory(`Deleted ${selectedGuests.size} guest(s) from guest list`);
+        }
         setGuestList(prevGuestList =>
             prevGuestList.filter(guest => !selectedGuests.has(guest.id))
         );
         setSelectedGuests(new Set());
         setContextMenu({ visible: false, x: 0, y: 0 }); // Hide context menu
+        setHasUnsavedChanges(true);
     };
 
-    const handleContextMenu = (e) => {
-        if (selectedGuests.size > 1) {
-            e.preventDefault();
+    // Guest Manager handlers
+    const handleManagerAddPlusOne = (originalId) => {
+        const primary = [...guestList, ...tables.flat()].find(g => g.id === originalId);
+        if (primary) {
+            handleAddPlusOne(primary);
+        }
+    };
+
+    const handleManagerAddChild = (originalId) => {
+        const primary = [...guestList, ...tables.flat()].find(g => g.id === originalId);
+        if (primary) {
+            handleAddChild(primary);
+        }
+    };
+
+    const handleManagerRenameGuest = (originalId, newFirst, newLast) => {
+        // Rename the primary guest only
+        setGuestList(prev => prev.map(g => g.id === originalId ? { ...g, firstName: newFirst, lastName: newLast } : g));
+        setTables(prev => prev.map(t => t.map(g => g.id === originalId ? { ...g, firstName: newFirst, lastName: newLast } : g)));
+        saveStateToHistory(`Renamed guest to ${newFirst} ${newLast}`);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleManagerDeleteGuest = (originalId) => {
+        // Remove primary and all plus ones linked to it from both guestList and tables
+        saveStateToHistory(`Deleted guest ${originalId} and their tickets`);
+        setGuestList(prev => prev.filter(g => g.id !== originalId && g.originalGuestId !== originalId));
+        setTables(prev => prev.map(t => t.filter(g => g.id !== originalId && g.originalGuestId !== originalId)));
+        setHasUnsavedChanges(true);
+    };
+
+    const handleManagerAddGuest = ({ firstName, lastName, group }) => {
+        const nextId = getNextGuestId();
+        const newGuest = { id: nextId, firstName, lastName, group: group || 'Ungrouped' };
+        saveStateToHistory(`Added guest ${firstName} ${lastName}`);
+        // Create the group if it doesn't exist yet
+        const grp = (group || 'Ungrouped').trim();
+        if (grp && !getUniqueGroups().includes(grp)) {
+            setCustomGroups(prev => {
+                const set = new Set(prev || []);
+                set.add(grp);
+                return Array.from(set);
+            });
+        }
+        setGuestList(prev => [...prev, newGuest]);
+        updateTables(guestList.length + 1);
+        setHasUnsavedChanges(true);
+    };
+
+    const handleManagerChangeGroup = (originalId, newGroupName) => {
+        const trimmed = (newGroupName || '').trim();
+        if (!trimmed) return;
+        saveStateToHistory(`Changed group of guest ${originalId} to "${trimmed}"`);
+        // Persist the group if it's new
+        if (!getUniqueGroups().includes(trimmed)) {
+            setCustomGroups(prev => {
+                const set = new Set(prev || []);
+                set.add(trimmed);
+                return Array.from(set);
+            });
+        }
+        // Update only the primary guest's group (plus ones keep their group inherited visually)
+        setGuestList(prev => prev.map(g => g.id === originalId ? { ...g, group: trimmed } : g));
+        setTables(prev => prev.map(t => t.map(g => g.id === originalId ? { ...g, group: trimmed } : g)));
+        setHasUnsavedChanges(true);
+    };
+
+    const handleContextMenu = (e, guestId = null) => {
+        e.preventDefault();
+        
+        // If a specific guest was right-clicked and it's not selected, select it
+        if (guestId && !selectedGuests.has(guestId)) {
+            setSelectedGuests(new Set([guestId]));
+        }
+        
+        // Show context menu if at least one guest is selected (or will be selected)
+        if (selectedGuests.size >= 1 || guestId) {
             setContextMenu({
                 visible: true,
                 x: e.clientX,
@@ -664,11 +1206,11 @@ const saveArrangement = async () => {
 
     const hideContextMenu = () => {
         setContextMenu({ visible: false, x: 0, y: 0 });
-        setShowGroupSubmenu(false);
     };
 
     const getUniqueGroups = () => {
-        const groups = new Set();
+        // Merge persisted custom groups with groups inferred from current guests
+        const groups = new Set(Array.isArray(customGroups) ? customGroups : []);
         guestList.forEach(guest => {
             if (guest.group) {
                 groups.add(guest.group);
@@ -740,10 +1282,14 @@ const saveArrangement = async () => {
     };
 
     const changeGuestGroup = (newGroup) => {
+        const trimmed = (newGroup || '').trim();
+        if (!trimmed) return;
+
+        saveStateToHistory(`Changed group for ${selectedGuests.size} guest(s) to "${trimmed}"`);
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
                 selectedGuests.has(guest.id)
-                    ? { ...guest, group: newGroup }
+                    ? { ...guest, group: trimmed }
                     : guest
             )
         );
@@ -752,7 +1298,7 @@ const saveArrangement = async () => {
             prevTables.map(table =>
                 table.map(guest =>
                     selectedGuests.has(guest.id)
-                        ? { ...guest, group: newGroup }
+                        ? { ...guest, group: trimmed }
                         : guest
                 )
             )
@@ -760,8 +1306,9 @@ const saveArrangement = async () => {
 
         setSelectedGuests(new Set());
         hideContextMenu();
+        setHasUnsavedChanges(true);
         
-        setAlertMessage(`Successfully changed group for ${selectedGuests.size} guest(s) to "${newGroup}"`);
+        setAlertMessage(`Successfully changed group for ${selectedGuests.size} guest(s) to "${trimmed}"`);
         setAlertSeverity('success');
         setAlertOpen(true);
     };
@@ -777,9 +1324,22 @@ const saveArrangement = async () => {
     };
 
     const saveNewGroup = () => {
-        if (!newGroupName.trim()) return;
-        
-        changeGuestGroup(newGroupName.trim());
+        const name = newGroupName.trim();
+        if (!name) return;
+
+        // Always add to custom groups
+        setCustomGroups(prev => {
+            const set = new Set(prev || []);
+            set.add(name);
+            return Array.from(set);
+        });
+    setHasUnsavedChanges(true);
+
+        // If there are selected guests, move them to the new group
+        if (selectedGuests.size > 0) {
+            changeGuestGroup(name);
+        }
+
         closeNewGroupModal();
     };
 
@@ -902,6 +1462,13 @@ const saveArrangement = async () => {
         setNewGuestsData([]);
     };
 
+    const handleLanguageChange = (newLanguage) => {
+        setCurrentLanguage(newLanguage);
+        console.log('Language changed to:', newLanguage);
+        // Here you can add additional logic when language changes
+        // such as updating text labels, date formats, etc.
+    };
+
     const handleAddRow = () => {
         const newRow = {
             id: newGuestsData.length + 1,
@@ -922,7 +1489,7 @@ const saveArrangement = async () => {
         );
         
         if (validGuests.length === 0) {
-            setAlertMessage('Please add at least one guest with first and last name');
+            setAlertMessage(t('pleaseAddGuest'));
             setAlertSeverity('warning');
             setAlertOpen(true);
             return;
@@ -936,345 +1503,21 @@ const saveArrangement = async () => {
             id: nextId++
         }));
 
-        setGuestList(prevGuestList => [...prevGuestList, ...guestsToAdd]);
+    saveStateToHistory(`Added ${guestsToAdd.length} guest(s)`);
+    setGuestList(prevGuestList => [...prevGuestList, ...guestsToAdd]);
         updateTables(guestList.length + guestsToAdd.length);
+    setHasUnsavedChanges(true);
         
-        setAlertMessage(`Successfully added ${guestsToAdd.length} guest(s)`);
+        setAlertMessage(t('guestAdded', { count: guestsToAdd.length }));
         setAlertSeverity('success');
         setAlertOpen(true);
         
         closeAddGuestsModal();
     };
 
-    const renderListView = () => {
-        return (
-            <div
-                className='tables-container'
-            >
-                {tables.map((table, tableIndex) => (
-                    <div
-                        key={tableIndex}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                            const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                            handleDrop(guest, tableIndex);
-                        }}
-                        className='single-table'
-                    >
-                        <div className="table-header"
-                        style={{
-                            ...(table.length === getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-completed-color)', color:'var(--table-header-completed-text-color)' } : {}),
-                            ...(table.length > getTableDisplaySize(tableIndex) ? { backgroundColor: 'var(--table-header-oversized-color)', color:'var(--table-header-oversized-text-color)' } : {}),
-                            ...(tableHasMatchingGuest(table) ? { 
-                                backgroundColor: 'var(--table-header-highlight-color, #c4ce40ff)', 
-                                border: '2px solid #1976d2',
-                                boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
-                            } : {})
-                        }}>
-                            {editingTable === tableIndex ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <TextField
-                                            type='text'
-                                            label="Table Alias"
-                                            size="small"
-                                            defaultValue={getTableDisplayName(tableIndex)}
-                                            style={{ flex: 1, backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableAliasChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                        />
-                                        <TextField
-                                            type='number'
-                                            min="1"
-                                            label="Table #"
-                                            size="small"
-                                            defaultValue={getTableDisplayNumber(tableIndex)}
-                                            style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableNumberChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <TextField
-                                            type='number'
-                                            min="1"
-                                            label="Max Size"
-                                            size="small"
-                                            defaultValue={getTableDisplaySize(tableIndex)}
-                                            style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableSizeChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                        />
-                                        <span style={{ color: 'white', fontSize: '14px', fontWeight: 'bold' }}>
-                                            Current: {table.length} guests
-                                        </span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <span style={{ fontWeight: 'bold', fontSize: '16px' }}>
-                                            {getTableDisplayName(tableIndex)}
-                                        </span>
-                                        <span style={{ fontSize: '14px' }}>
-                                            Table #{getTableDisplayNumber(tableIndex)}
-                                        </span>
-                                    </div>
-                                    <div style={{ fontSize: '14px' }}>
-                                        Seated: {table.length}/{getTableDisplaySize(tableIndex)}
-                                    </div>
-                                </div>
-                            )}
-                            <div style={{ display: 'flex', gap: '5px' }}>
-                                <IconButton
-                                    onClick={() => handleTableEditClick(tableIndex)}
-                                    color="inherit"
-                                    size="small"
-                                    title="Edit table settings"
-                                    sx={{ color: 'white' }}
-                                >
-                                    <Icon>edit</Icon>
-                                </IconButton>
-                                {table.length > 0 && (
-                                    <IconButton
-                                        onClick={() => handleClearTable(tableIndex)}
-                                        color="inherit"
-                                        size="small"
-                                        title="Clear all guests from this table"
-                                        sx={{ color: 'white' }}
-                                    >
-                                        <Icon>delete</Icon>
-                                    </IconButton>
-                                )}
-                            </div>
-                        </div>
-                        <div className="table-content">
-                            {table.map((guest) => (
-                                <div
-                                    key={guest.id}
-                                    draggable
-                                    onDragStart={(e) => {
-                                        e.dataTransfer.setData(
-                                            'guest',
-                                            JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
-                                        );
-                                    }}
-                                    className='table-guest-item'
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                                        <span style={{ flex: 1 }}>
-                                            {highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}
-                                        </span>
-                                    </div>
-                                    <div style={{ marginLeft: '10px', display: 'flex', gap: '5px' }}>
-                                        <IconButton
-                                            onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
-                                            color="primary"
-                                            size="small"
-                                            title="Edit guest name"
-                                        >
-                                            <Icon>edit</Icon>
-                                        </IconButton>
-                                        <IconButton
-                                            onClick={() => handleRemove(guest, tableIndex)}
-                                            color="error"
-                                            size="small"
-                                            title="Remove from table"
-                                        >
-                                            <CloseIcon />
-                                        </IconButton>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        );
-    };
 
-    const renderVisualView = () => {
-        return (
-            <div
-                className='visual-tables-container'
-            >
-                {tables.map((table, tableIndex) => (
-                    <div
-                        key={tableIndex}
-                        onDragOver={(e) => e.preventDefault()}                    onDrop={(e) => {
-                            const guest = JSON.parse(e.dataTransfer.getData('guest'));
-                            handleDrop(guest, tableIndex);
-                        }}
-                        className='visual-table-border'
-                    >
-                        <div
-                            className='visual-table-title'
-                            style={{
-                                ...(tableHasMatchingGuest(table) ? { 
-                                    backgroundColor: '#e3f2fd', 
-                                    border: '2px solid #1976d2',
-                                    boxShadow: '0 2px 8px rgba(25, 118, 210, 0.3)'
-                                } : {})
-                            }}
-                        >
-                            {editingTable === tableIndex ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: '160px' }}>
-                                    {/* First Row: Table Alias and Number */}
-                                    <div style={{ display: 'flex', gap: '4px' }}>
-                                        <input
-                                            type="text"
-                                            defaultValue={getTableDisplayName(tableIndex)}
-                                            placeholder="Table name..."
-                                            
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableAliasChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                            autoFocus
-                                            style={{
-                                                background: 'white',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                padding: '2px 4px',
-                                                fontSize: '11px',
-                                                flex: 1
-                                            }}
-                                        />
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            defaultValue={getTableDisplayNumber(tableIndex)}
-                                            
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableNumberChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                            style={{
-                                                background: 'white',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                padding: '2px 4px',
-                                                fontSize: '11px',
-                                                width: '40px'
-                                            }}
-                                        />
-                                    </div>
-                                    {/* Second Row: Max Size */}
-                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                        <span style={{ fontSize: '10px', color: '#333' }}>Max:</span>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            defaultValue={getTableDisplaySize(tableIndex)}
-                                            
-                                            onKeyPress={(e) => {
-                                                if (e.key === 'Enter') {
-                                                    handleTableSizeChange(tableIndex, e.target.value);
-                                                    handleTableEditComplete();
-                                                }
-                                            }}
-                                            style={{
-                                                background: 'white',
-                                                border: '1px solid #ccc',
-                                                borderRadius: '4px',
-                                                padding: '2px 4px',
-                                                fontSize: '11px',
-                                                width: '40px'
-                                            }}
-                                        />
-                                        <span style={{ fontSize: '10px', color: '#333' }}>
-                                            Current: {table.length}
-                                        </span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, textAlign: 'center' }}>
-                                    {/* First Row: Table Name and Number */}
-                                    <div style={{ fontWeight: 'bold', fontSize: '13px' }}>
-                                        {getTableDisplayName(tableIndex)} #{getTableDisplayNumber(tableIndex)}
-                                    </div>
-                                    {/* Second Row: Occupancy */}
-                                    <div style={{ fontSize: '11px' }}>
-                                        {table.length}/{getTableDisplaySize(tableIndex)}
-                                    </div>
-                                </div>
-                            )}
-                            <div style={{ display: 'flex', gap: '2px' }}>
-                                <IconButton
-                                    onClick={() => handleTableEditClick(tableIndex)}
-                                    color="primary"
-                                    size="small"
-                                    title="Edit table settings"
-                                    sx={{ minWidth: '24px', minHeight: '24px', padding: '2px' }}
-                                >
-                                    <Icon sx={{ fontSize: '16px' }}>edit</Icon>
-                                </IconButton>
-                                {table.length > 0 && (
-                                    <IconButton
-                                        onClick={() => handleClearTable(tableIndex)}
-                                        color="error"
-                                        size="small"
-                                        title="Clear all guests from this table"
-                                        sx={{ minWidth: '24px', minHeight: '24px', padding: '2px' }}
-                                    >
-                                        <Icon sx={{ fontSize: '16px' }}>delete</Icon>
-                                    </IconButton>
-                                )}
-                            </div>
-                        </div>
-                    {table.map((guest, index) => {
-                        const currentTableSize = getTableDisplaySize(tableIndex);
-                        const angle = (index / currentTableSize) * 2 * Math.PI; // Divide the circle into equal parts based on table size
-                        const radius = 120; // Distance from the center
-                        const x = 150 + radius * Math.cos(angle)-30; // Calculate x position
-                        const y = 150 + radius * Math.sin(angle)-30; // Calculate y position
-                        return (
-                            <div
-                                key={guest.id}
-                                draggable
-                                onDragStart={(e) => {
-                                    e.dataTransfer.setData(
-                                        'guest',
-                                        JSON.stringify({ ...guest, fromTableIndex: tableIndex }) // Include original table index
-                                    );
-                                }}
-                                onDoubleClick={() => {
-                                    // Double-click to edit any guest
-                                    openEditModal(guest.id, guest.firstName, guest.lastName);
-                                }}
-                                className='visual-table-guest-item'
-                                style={{
-                                    position: 'absolute',
-                                    top: `${y}px`,
-                                    left: `${x}px`,
-                                    
-                                }}
-                            >
-                                <span>{highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}</span>
-                            </div>
-                        );
-                    })}
-                </div>
-            ))}
-        </div>
-    );
-};
+
+
 
     const renderGuestList = () => {
         if (isGrouped) {
@@ -1301,11 +1544,9 @@ const saveArrangement = async () => {
                 return getGuestOrder(a).localeCompare(getGuestOrder(b));
             });
             }
-            console.log('Grouped Guests:', groupedGuests);
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
                     <h3 
-                        onClick={() => toggleGroupCollapse(groupName)}
                         style={{ 
                             cursor: 'pointer',
                             display: 'flex',
@@ -1329,16 +1570,42 @@ const saveArrangement = async () => {
                             e.target.style.borderColor = '#e0e0e0';
                         }}
                     >
-                        <span style={{ 
-                            fontSize: '16px', 
-                            fontWeight: 'bold',
-                            color: '#2196f3',
-                            transition: 'transform 0.2s ease',
-                            transform: collapsedGroups.has(groupName) ? 'rotate(0deg)' : 'rotate(90deg)'
-                        }}>
+                        <input
+                            type="checkbox"
+                            checked={isGroupSelected(groupedGuests[groupName])}
+                            ref={checkbox => {
+                                if (checkbox) {
+                                    checkbox.indeterminate = isGroupPartiallySelected(groupedGuests[groupName]);
+                                }
+                            }}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                handleSelectGroup(groupName, groupedGuests[groupName]);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{ 
+                                marginRight: '8px',
+                                cursor: 'pointer',
+                                transform: 'scale(1.2)'
+                            }}
+                        />
+                        <span 
+                            onClick={() => toggleGroupCollapse(groupName)}
+                            style={{ 
+                                fontSize: '16px', 
+                                fontWeight: 'bold',
+                                color: '#2196f3',
+                                transition: 'transform 0.2s ease',
+                                transform: collapsedGroups.has(groupName) ? 'rotate(0deg)' : 'rotate(90deg)',
+                                cursor: 'pointer'
+                            }}
+                        >
                             ▶
                         </span>
-                        <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#333' }}>
+                        <span 
+                            onClick={() => toggleGroupCollapse(groupName)}
+                            style={{ fontSize: '16px', fontWeight: 'bold', color: '#333', cursor: 'pointer' }}
+                        >
                             {groupName}
                         </span>
                         <span style={{ 
@@ -1389,7 +1656,7 @@ const saveArrangement = async () => {
                                             e.dataTransfer.setData('guest', JSON.stringify(guest));
                                         }
                                     }}
-                                    onContextMenu={handleContextMenu}
+                                    onContextMenu={(e) => handleContextMenu(e, guest.id)}
                                     className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                                     style={{
                                         backgroundColor: matchesSearch(guest) ? '#e3f2fd' : 'transparent',
@@ -1426,6 +1693,17 @@ const saveArrangement = async () => {
                                                 <Icon>exposure_plus_1</Icon>
                                             </Button>
                                         )}
+                                        {canAddPlusOne(guest.id) && (
+                                            <Button
+                                                variant="contained"
+                                                color="primary"
+                                                onClick={() => handleAddChild(guest)}
+                                                style={{ marginLeft: '10px' }}
+                                                className=''
+                                            >
+                                                <Icon>child_friendly</Icon>
+                                            </Button>
+                                        )}
                                         <IconButton
                                             onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
                                             color="primary"
@@ -1434,7 +1712,6 @@ const saveArrangement = async () => {
                                         >
                                             <Icon>edit</Icon>
                                         </IconButton>
-                                        
                                     </div>
                                 </div>
                                 {/* "+1" guests */}
@@ -1478,7 +1755,7 @@ const saveArrangement = async () => {
                                         isMultiDrag: true,
                                         selectedGuests: selectedGuestsList,
                                         id: 'multi-drag', // Placeholder ID for multi-drag
-                                        firstName: `${selectedGuests.size} guests`,
+                                        firstName: `${selectedGuests.size} ${t('guests')}`,
                                         lastName: ''
                                     }));
                                 } else {
@@ -1486,7 +1763,7 @@ const saveArrangement = async () => {
                                     e.dataTransfer.setData('guest', JSON.stringify(guest));
                                 }
                             }}
-                            onContextMenu={handleContextMenu}
+                            onContextMenu={(e) => handleContextMenu(e, guest.id)}
                             className={`guest-item ${selectedGuests.has(guest.id) ? 'selected' : ''}`}
                             style={{
                                 backgroundColor: matchesSearch(guest) ? '#e3f2fd' : 'transparent',
@@ -1512,6 +1789,26 @@ const saveArrangement = async () => {
                                 </Icon>
                             )}
                             <div style={{ display: 'flex', gap: '5px' }}>
+                                
+                                {canAddPlusOne(guest.id) && (
+                                    <Button
+                                                variant="contained"
+                                                color="primary"
+                                                onClick={() => handleAddPlusOne(guest)}
+                                                style={{ marginLeft: '10px' }}
+                                                className='plus-one-button'
+                                            >
+                                                <Icon>exposure_plus_1</Icon>
+                                            </Button>
+                                )}
+                                <IconButton
+                                    onClick={() => handleAddChild(guest)}
+                                    color="primary"
+                                    size="small"
+                                    title="Add Child"
+                                >
+                                    <ChildFriendlyIcon />
+                                </IconButton>
                                 <IconButton
                                     onClick={() => openEditModal(guest.id, guest.firstName, guest.lastName)}
                                     color="primary"
@@ -1520,16 +1817,6 @@ const saveArrangement = async () => {
                                 >
                                     <Icon>edit</Icon>
                                 </IconButton>
-                                {canAddPlusOne(guest.id) && (
-                                    <Button
-                                        variant="contained"
-                                        color="primary"
-                                        onClick={() => handleAddPlusOne(guest)}
-                                        style={{ marginLeft: '10px' }}
-                                    >
-                                        <ExposurePlus1Icon />
-                                    </Button>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -1549,127 +1836,85 @@ const saveArrangement = async () => {
         p: 4,
     };
 
+    // Calculate total seated guests
+    const totalSeatedGuests = tables.flat().length;
+
     return (
-        <div style={{ display: 'flex' }} onClick={hideContextMenu}>
-            {/* Configuration Modal Component */}
-            <ConfigurationModal 
-                onExportToJSON={exportToJSON}
-                onDeleteArrangement={deleteArrangement}
-                onCSVImport={handleCSVImport}
-                onDownloadSampleCSV={downloadSampleCSV}
-                weddingId={weddingId}
-            />
-            
-            {/* Context Menu */}
-            {contextMenu.visible && (
-                <div
-                    style={{
-                        position: 'fixed',
-                        top: contextMenu.y,
-                        left: contextMenu.x,
-                        backgroundColor: 'white',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-                        zIndex: 1000,
-                        minWidth: '150px'
-                    }}
-                >
-                    <div
-                        style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            borderBottom: '1px solid #eee'
-                        }}
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            removeSelectedGuests();
-                        }}
-                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                        onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                    >
-                        Delete Selected Guests ({selectedGuests.size})
-                    </div>
-                    <div
-                        style={{
-                            padding: '8px 12px',
-                            cursor: 'pointer',
-                            position: 'relative'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.backgroundColor = '#f5f5f5';
-                            setShowGroupSubmenu(true);
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.backgroundColor = 'white';
-                            // Don't hide submenu immediately to allow navigation
-                        }}
-                    >
-                        Change Group... ({selectedGuests.size})
-                        <span style={{ float: 'right' }}>▶</span>
-                        
-                        {/* Group Submenu */}
-                        {showGroupSubmenu && (
-                            <div
-                                style={{
-                                    position: 'absolute',
-                                    top: contextMenu.y + 60 > window.innerHeight - 200 ? 'auto' : 0,
-                                    bottom: contextMenu.y + 60 > window.innerHeight - 200 ? 0 : 'auto',
-                                    left: '100%',
-                                    backgroundColor: 'white',
-                                    border: '1px solid #ccc',
-                                    borderRadius: '4px',
-                                    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-                                    minWidth: '120px',
-                                    maxHeight: '200px',
-                                    overflowY: 'auto',
-                                    zIndex: 1001
-                                }}
-                                onMouseEnter={() => setShowGroupSubmenu(true)}
-                                onMouseLeave={() => setShowGroupSubmenu(false)}
-                            >
-                                {getUniqueGroups().map((group, index) => (
-                                    <div
-                                        key={group}
-                                        style={{
-                                            padding: '8px 12px',
-                                            cursor: 'pointer',
-                                            borderBottom: index < getUniqueGroups().length - 1 ? '1px solid #eee' : 'none'
-                                        }}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            changeGuestGroup(group);
-                                        }}
-                                        onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                                        onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                                    >
-                                        {group}
-                                    </div>
-                                ))}
-                                {getUniqueGroups().length > 0 && (
-                                    <div style={{ borderTop: '1px solid #ddd', margin: '4px 0' }} />
-                                )}
-                                <div
-                                    style={{
-                                        padding: '8px 12px',
-                                        cursor: 'pointer',
-                                        fontStyle: 'italic',
-                                        color: '#666'
-                                    }}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        openNewGroupModal();
-                                    }}
-                                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-                                    onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                                >
-                                    Add new group...
-                                </div>
-                            </div>
-                        )}
+        <div>
+            {/* Loading Overlay */}
+            {isLoading && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    zIndex: 9999,
+                    color: 'white',
+                    fontSize: '1.2rem'
+                }}>
+                    <div>
+                        <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                            Loading...
+                        </div>
+                        <div style={{ textAlign: 'center' }}>
+                            <div className="loading-spinner" style={{
+                                border: '4px solid #f3f3f3',
+                                borderTop: '4px solid #3498db',
+                                borderRadius: '50%',
+                                width: '40px',
+                                height: '40px',
+                                animation: 'spin 2s linear infinite',
+                                margin: '0 auto'
+                            }}></div>
+                        </div>
                     </div>
                 </div>
             )}
+            
+            {/* Top Action Bar */}
+                <TopActionBar
+                    onSave={saveArrangement}
+                    onExportAlphabetical={exportToPDF}
+                    onExportGrouped={exportToPDFGroupedByTables}
+                    onExportTickets={exportGuestTicketsToPDF}
+                    onExportTicketsByGroup={exportGuestTicketsByGroupToPDF}
+                    onUndo={performUndo}
+                    canUndo={undoHistory.length > 0}
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    currentLanguage={currentLanguage}
+                    isDisabled={isLoading}
+                    totalSeatedGuests={totalSeatedGuests}
+                />
+            <div style={{ display: 'flex' }} onClick={hideContextMenu}>
+            {/* Configuration Modal Component */}
+                    <ConfigurationModal
+                        onExportToJSON={exportToJSON}
+                        onDeleteArrangement={deleteArrangement}
+                        onCSVImport={handleCSVImport}
+                        onDownloadSampleCSV={downloadSampleCSV}
+                        onLanguageChange={handleLanguageChange}
+                        currentLanguage={currentLanguage}
+                        weddingId={weddingId}
+                        existingGuests={guestList}
+                        existingTables={tables}
+                    />            {/* Context Menu */}
+            <ContextMenu
+                visible={contextMenu.visible}
+                x={contextMenu.x}
+                y={contextMenu.y}
+                selectedGuestsSize={selectedGuests.size}
+                uniqueGroups={getUniqueGroups()}
+                onDeleteGuests={removeSelectedGuests}
+                onChangeGroup={changeGuestGroup}
+                onOpenNewGroupModal={openNewGroupModal}
+                onHide={hideContextMenu}
+                currentLanguage={currentLanguage}
+            />
             {/* New Group Modal */}
             <Modal
                 open={showNewGroupModal}
@@ -1734,7 +1979,11 @@ const saveArrangement = async () => {
                     overflow: 'auto'
                 }}>
                     <Typography id="add-guests-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
-                        Add New Guests
+                        {t('addGuests')}
+                    </Typography>
+                    
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontStyle: 'italic' }}>
+                        {t('addGuestsInstructions')}
                     </Typography>
                     
                     <div style={{ height: 400, width: '100%', marginBottom: '16px' }}>
@@ -1743,19 +1992,19 @@ const saveArrangement = async () => {
                             columns={[
                                 {
                                     field: 'firstName',
-                                    headerName: 'First Name',
+                                    headerName: t('firstName'),
                                     width: 200,
                                     editable: true,
                                 },
                                 {
                                     field: 'lastName',
-                                    headerName: 'Last Name',
+                                    headerName: t('lastName'),
                                     width: 200,
                                     editable: true,
                                 },
                                 {
                                     field: 'group',
-                                    headerName: 'Group',
+                                    headerName: t('group'),
                                     width: 200,
                                     editable: true,
                                     type: 'singleSelect',
@@ -1763,7 +2012,7 @@ const saveArrangement = async () => {
                                 },
                                 {
                                     field: 'actions',
-                                    headerName: 'Actions',
+                                    headerName: t('actions'),
                                     width: 100,
                                     renderCell: (params) => (
                                         <IconButton
@@ -1801,6 +2050,7 @@ const saveArrangement = async () => {
                         >
                             Add Row
                         </Button>
+                        
                     </Box>
                     
                     <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -1808,18 +2058,33 @@ const saveArrangement = async () => {
                             variant="outlined"
                             onClick={closeAddGuestsModal}
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                         <Button
                             variant="contained"
                             onClick={saveNewGuests}
                             color="primary"
                         >
-                            Add Guests
+                            {t('addGuests')}
                         </Button>
                     </Box>
                 </Box>
             </Modal>
+
+            {/* Guest Manager Modal */}
+            <GuestManagerModal
+                open={showGuestManager}
+                onClose={() => setShowGuestManager(false)}
+                currentLanguage={currentLanguage}
+                allGuests={[...guestList, ...tables.flat()]}
+                onAddPlusOne={handleManagerAddPlusOne}
+                onAddChild={handleManagerAddChild}
+                onRenameGuest={handleManagerRenameGuest}
+                onDeleteGuest={handleManagerDeleteGuest}
+                onAddGuest={handleManagerAddGuest}
+                onChangeGroup={handleManagerChangeGroup}
+                groups={getUniqueGroups()}
+            />
 
             {/* Edit Guest Modal */}
             <Modal
@@ -1830,11 +2095,11 @@ const saveArrangement = async () => {
             >
                 <Box sx={modalStyle}>
                     <Typography id="edit-guest-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
-                        Edit Guest Information
+                        {t('editGuest')} {t('info')}
                     </Typography>
                     <TextField
                         fullWidth
-                        label="First Name"
+                        label={t('firstName')}
                         value={editFirstName}
                         onChange={(e) => setEditFirstName(e.target.value)}
                         margin="normal"
@@ -1842,7 +2107,7 @@ const saveArrangement = async () => {
                     />
                     <TextField
                         fullWidth
-                        label="Last Name"
+                        label={t('lastName')}
                         value={editLastName}
                         onChange={(e) => setEditLastName(e.target.value)}
                         margin="normal"
@@ -1853,14 +2118,14 @@ const saveArrangement = async () => {
                             variant="outlined"
                             onClick={closeEditModal}
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                         <Button
                             variant="contained"
                             onClick={saveGuestEdit}
                             disabled={!editFirstName.trim()}
                         >
-                            Save
+                            {t('save')}
                         </Button>
                     </Box>
                 </Box>
@@ -1901,57 +2166,24 @@ const saveArrangement = async () => {
                     {/* Action Buttons */}
                     <div className="button-section">
                         <div className="button-row">
-                            <Button
-                                variant="contained"
-                                color="success"
-                                onClick={openAddGuestsModal}
-                                className='add-guests-button'
-                                size="small"
-                            >
-                                ➕ Add Guests
-                            </Button>
-                        </div>
-                        <div className="button-row">
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={saveArrangement}
-                                className='save-button'
-                                size="small"
-                            >
-                                Save Arrangement
-                            </Button>
-                        </div>
-                        
-                        <div className="button-row">
                             <ButtonGroup 
                                 variant="contained" 
                                 color="success"
-                                ref={exportAnchorRef}
-                                aria-label="PDF export options"
+                                ref={addAnchorRef}
+                                aria-label="Add options"
                                 size="small"
                             >
                                 <Button 
-                                    onClick={() => handleExportOption('alphabetical')}
-                                    className='export-button'
+                                    onClick={handleAddMenuToggle}
+                                    className='add-guests-button'
                                 >
-                                    Export as PDF
-                                </Button>
-                                <Button
-                                    size="small"
-                                    aria-controls={exportMenuOpen ? 'export-split-button-menu' : undefined}
-                                    aria-expanded={exportMenuOpen ? 'true' : undefined}
-                                    aria-label="select export option"
-                                    aria-haspopup="menu"
-                                    onClick={handleExportMenuToggle}
-                                >
-                                    <ArrowDropDownIcon />
+                                    ➕
                                 </Button>
                             </ButtonGroup>
                             <Popper
-                                sx={{ zIndex: 1 }}
-                                open={exportMenuOpen}
-                                anchorEl={exportAnchorRef.current}
+                                sx={{ zIndex: 1000 }}
+                                open={addMenuOpen}
+                                anchorEl={addAnchorRef.current}
                                 role={undefined}
                                 transition
                                 disablePortal
@@ -1962,16 +2194,52 @@ const saveArrangement = async () => {
                                         style={{
                                             transformOrigin:
                                                 placement === 'bottom' ? 'center top' : 'center bottom',
+                                            
                                         }}
                                     >
-                                        <Paper>
-                                            <ClickAwayListener onClickAway={handleExportMenuClose}>
-                                                <MenuList id="export-split-button-menu" autoFocusItem>
-                                                    <MenuItem onClick={() => handleExportOption('alphabetical')}>
-                                                        Alphabetical List
+                                        <Paper 
+                                            sx={{ 
+                                                backgroundColor: 'white',
+                                                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                                                border: '1px solid #e0e0e0',
+                                                opacity: 1
+                                            }}
+                                        >
+                                            <ClickAwayListener onClickAway={handleAddMenuClose}>
+                                                <MenuList 
+                                                    id="add-split-button-menu" 
+                                                    autoFocusItem
+                                                    sx={{ 
+                                                        backgroundColor: 'white',
+                                                        opacity: 1,
+                                                        minWidth: 120
+                                                    }}
+                                                >
+                                                    <MenuItem 
+                                                        onClick={() => handleAddOption('guests')}
+                                                        sx={{ 
+                                                            backgroundColor: 'white',
+                                                            color: '#333',
+                                                            opacity: 1,
+                                                            '&:hover': {
+                                                                backgroundColor: '#f5f5f5'
+                                                            }
+                                                        }}
+                                                    >
+                                                        {t('addGuests')}
                                                     </MenuItem>
-                                                    <MenuItem onClick={() => handleExportOption('grouped')}>
-                                                        Grouped by Tables
+                                                    <MenuItem 
+                                                        onClick={() => handleAddOption('group')}
+                                                        sx={{ 
+                                                            backgroundColor: 'white',
+                                                            color: '#333',
+                                                            opacity: 1,
+                                                            '&:hover': {
+                                                                backgroundColor: '#f5f5f5'
+                                                            }
+                                                        }}
+                                                    >
+                                                        {t('addGroup')}
                                                     </MenuItem>
                                                 </MenuList>
                                             </ClickAwayListener>
@@ -1979,15 +2247,9 @@ const saveArrangement = async () => {
                                     </Grow>
                                 )}
                             </Popper>
-                            <Button
-                                variant="contained"
-                                color="primary"
-                                onClick={exportGuestTicketsToPDF}
-                                className='export-button'
-                                size="small"
-                            >
-                                📋 Export ticket Information
-                            </Button>
+                        </div>
+                        
+                        <div className="button-row">
                             <Button
                                 variant="contained"
                                 color="info"
@@ -1995,7 +2257,7 @@ const saveArrangement = async () => {
                                 className='switch-button'
                                 size="small"
                             >
-                                Change view mode
+                                {viewMode === 'visual' ? <ListAltIcon /> : <TableBarIcon />}
                             </Button>
                             <Button
                                 variant="contained"
@@ -2004,8 +2266,16 @@ const saveArrangement = async () => {
                                 className='delete-button'
                                 size="small"
                             >
-                                Remove Selected Guests
+                                <PersonRemoveIcon />
                             </Button>
+                            <Button
+                            variant="outlined"
+                            onClick={() => setShowGuestManager(true)}
+                            size="small"
+                            className='guest-manager-button'
+                        >
+                            <GroupIcon />
+                        </Button>
                         </div>
                     </div>
                     
@@ -2018,7 +2288,7 @@ const saveArrangement = async () => {
                                 onChange={(e) => setIsGrouped(e.target.checked)}
                                 style={{ marginRight: '5px' }}
                             />
-                            Group Guests
+                            {t('groupGuests')}
                         </label>
                         
                         {isGrouped && (
@@ -2032,7 +2302,7 @@ const saveArrangement = async () => {
                                     minWidth: 'auto'
                                 }}
                             >
-                                {getUniqueGroups().every(group => collapsedGroups.has(group)) ? 'Expand All' : 'Collapse All'}
+                                {getUniqueGroups().every(group => collapsedGroups.has(group)) ? t('expandAll') : t('collapseAll')}
                             </Button>
                         )}
                     </div>
@@ -2042,7 +2312,7 @@ const saveArrangement = async () => {
                         <TextField
                             fullWidth
                             size="small"
-                            label="Search guests..."
+                            label={t('searchGuests')}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             variant="outlined"
@@ -2065,8 +2335,8 @@ const saveArrangement = async () => {
                     </div>
                     
                     {/* Statistics */}
-                    <p className="guest-list-stats">Total Guests: {guestList.length}</p>
-                    
+                    <p className="guest-list-stats">{t('remainingGuests')}: {guestList.length}</p>
+
                     {/* Selected guests info */}
                     {selectedGuests.size > 1 && (
                         <div style={{ 
@@ -2077,7 +2347,7 @@ const saveArrangement = async () => {
                             fontSize: '14px',
                             color: '#1976d2'
                         }}>
-                            <strong>{selectedGuests.size} guests selected</strong> - Drag any selected guest to move all together
+                            <strong>{selectedGuests.size} {t('guestsSelected')}</strong> - {t('dragToMoveMessage')}
                         </div>
                     )}
                 </div>
@@ -2095,13 +2365,34 @@ const saveArrangement = async () => {
                             color: '#2e7d32',
                             textAlign: 'center'
                         }}>
-                            🔄 Drop here to unassign from table
+                            🔄 {t('dropToUnassign')}
                         </div>
                     )}
                     {renderGuestList()}
                 </div>
             </div>
-            {viewMode === 'list' ? renderListView() : renderVisualView()}
+            <TableList
+                viewMode={viewMode}
+                tables={tables}
+                editingTable={editingTable}
+                highlightSearchTerm={highlightSearchTerm}
+                onDrop={handleDrop}
+                tableHasMatchingGuest={tableHasMatchingGuest}
+                getTableDisplayName={getTableDisplayName}
+                getTableDisplayNumber={getTableDisplayNumber}
+                getTableDisplaySize={getTableDisplaySize}
+                onTableEditClick={handleTableEditClick}
+                onTableEditComplete={handleTableEditComplete}
+                onTableAliasChange={handleTableAliasChange}
+                onTableNumberChange={handleTableNumberChange}
+                onTableSizeChange={handleTableSizeChange}
+                onClearTable={handleClearTable}
+                onAddTable={handleAddTable}
+                onEditGuest={openEditModal}
+                onRemoveGuest={handleRemove}
+                currentLanguage={currentLanguage}
+            />
+            </div>
         </div>
     );
 }

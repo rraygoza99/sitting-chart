@@ -5,19 +5,30 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
+import Switch from '@mui/material/Switch';
+import FormControlLabel from '@mui/material/FormControlLabel';
 import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CSVImporter from './CSVImporter';
+import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 const ConfigurationModal = ({ 
     onExportToJSON, 
     onDeleteArrangement, 
     onCSVImport,
     onDownloadSampleCSV,
-    weddingId 
+    onLanguageChange,
+    weddingId,
+    existingGuests = [],
+    existingTables = [],
+    currentLanguage = 'english' // Add currentLanguage prop
 }) => {
     const [open, setOpen] = useState(false);
     const [defaultTableSize, setDefaultTableSize] = useState(10);
+    const [language, setLanguage] = useState('english'); // 'english' or 'spanish'
+    
+    // Use translation hook
+    const { t } = useSeatingTranslation(currentLanguage);
 
     // Load saved configuration on component mount
     useEffect(() => {
@@ -26,6 +37,7 @@ const ConfigurationModal = ({
             try {
                 const config = JSON.parse(savedConfig);
                 setDefaultTableSize(config.defaultTableSize || 10);
+                setLanguage(config.language || 'english');
             } catch (error) {
                 console.error('Error loading configuration:', error);
             }
@@ -38,10 +50,17 @@ const ConfigurationModal = ({
     const handleSave = () => {
         // Save the configuration to localStorage
         const config = {
-            defaultTableSize: defaultTableSize
+            defaultTableSize: defaultTableSize,
+            language: language
         };
         localStorage.setItem('seatingConfiguration', JSON.stringify(config));
-        console.log('Saving default table size:', defaultTableSize);
+        console.log('Saving configuration:', config);
+        
+        // Notify parent component of language change
+        if (onLanguageChange) {
+            onLanguageChange(language);
+        }
+        
         setOpen(false);
     };
 
@@ -50,6 +69,10 @@ const ConfigurationModal = ({
         if (!isNaN(value) && value > 0) {
             setDefaultTableSize(value);
         }
+    };
+
+    const handleLanguageChange = (event) => {
+        setLanguage(event.target.checked ? 'spanish' : 'english');
     };
 
     const modalStyle = {
@@ -90,7 +113,7 @@ const ConfigurationModal = ({
             <IconButton
                 onClick={handleOpen}
                 sx={configButtonStyle}
-                title="Configuration Settings"
+                title={t('configurationSettings')}
             >
                 <SettingsIcon fontSize="large" />
             </IconButton>
@@ -105,7 +128,7 @@ const ConfigurationModal = ({
                 <Box sx={modalStyle}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                         <Typography id="configuration-modal-title" variant="h5" component="h2">
-                            Configuration Settings
+                            {t('configurationSettingsTitle')}
                         </Typography>
                         <IconButton onClick={handleClose} size="small">
                             <CloseIcon />
@@ -113,21 +136,54 @@ const ConfigurationModal = ({
                     </Box>
                     
                     <Typography variant="body1" sx={{ mb: 3 }}>
-                        Configure your seating arrangement settings here.
+                        {t('configureSeatingSettings')}
                     </Typography>
+
+                    {/* Language Settings */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>
+                            {t('languageSettings')}
+                        </Typography>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={language === 'spanish'}
+                                    onChange={handleLanguageChange}
+                                    color="primary"
+                                />
+                            }
+                            label={
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Typography variant="body1">
+                                        {language === 'english' ? '🇺🇸 English' : '🇪🇸 Español'}
+                                    </Typography>
+                                </Box>
+                            }
+                            labelPlacement="start"
+                            sx={{ 
+                                display: 'flex', 
+                                justifyContent: 'space-between',
+                                marginLeft: 0,
+                                width: '100%'
+                            }}
+                        />
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            {t('switchLanguage')}
+                        </Typography>
+                    </Box>
 
                     {/* Table Size Configuration */}
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="h6" sx={{ mb: 2 }}>
-                            Table Settings
+                            {t('tableSettings')}
                         </Typography>
                         <TextField
                             fullWidth
-                            label="Default Table Size"
+                            label={t('defaultTableSize')}
                             type="number"
                             value={defaultTableSize}
                             onChange={handleTableSizeChange}
-                            helperText="Number of seats per table (default: 10)"
+                            helperText={t('numberSeatsPerTable')}
                             inputProps={{
                                 min: 1,
                                 max: 20
@@ -139,10 +195,14 @@ const ConfigurationModal = ({
                     {/* CSV Import Actions */}
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="h6" sx={{ mb: 2 }}>
-                            CSV Import
+                            {t('csvImport')}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                            <CSVImporter onImport={onCSVImport} />
+                            <CSVImporter 
+                                onImport={onCSVImport} 
+                                existingGuests={existingGuests}
+                                existingTables={existingTables}
+                            />
                             <Button
                                 variant="outlined"
                                 color="info"
@@ -150,18 +210,18 @@ const ConfigurationModal = ({
                                 size="medium"
                                 sx={{ minWidth: '150px' }}
                             >
-                                📄 Download Sample CSV
+                                📄 {t('downloadSampleCSV')}
                             </Button>
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            Import guests from CSV file or download a sample CSV template
+                            {t('csvFormatHelp')}
                         </Typography>
                     </Box>
 
                     {/* Arrangement Actions */}
                     <Box sx={{ mb: 3 }}>
                         <Typography variant="h6" sx={{ mb: 2 }}>
-                            Arrangement Actions
+                            {t('arrangementActions')}
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
                             <Button
@@ -171,7 +231,7 @@ const ConfigurationModal = ({
                                 size="medium"
                                 sx={{ minWidth: '150px' }}
                             >
-                                Export to JSON
+                                {t('exportToJSON')}
                             </Button>
                             <Button
                                 variant="contained"
@@ -180,11 +240,11 @@ const ConfigurationModal = ({
                                 size="medium"
                                 sx={{ minWidth: '150px' }}
                             >
-                                Delete Arrangement
+                                {t('delete')} {t('arrangement')}
                             </Button>
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            {weddingId ? `Current arrangement: ${weddingId}` : 'No arrangement selected'}
+                            {weddingId ? t('currentArrangement', { name: weddingId }) : t('noArrangementSelected')}
                         </Typography>
                     </Box>
 
@@ -193,13 +253,13 @@ const ConfigurationModal = ({
                             variant="outlined"
                             onClick={handleClose}
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                         <Button
                             variant="contained"
                             onClick={handleSave}
                         >
-                            Save Settings
+                            {t('save')} {t('settings')}
                         </Button>
                     </Box>
                 </Box>
