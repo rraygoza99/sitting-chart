@@ -43,3 +43,13 @@
 .listItemText{
     max-width: 100%;
 }
+
+.greetingBar{
+    background: linear-gradient(90deg,#f5f7fa,#e9eef7);
+    padding: 12px 20px;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #111;
+    border-radius: 6px;
+    margin: 1rem 2rem;
+}

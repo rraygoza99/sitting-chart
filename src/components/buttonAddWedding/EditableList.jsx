@@ -14,7 +14,7 @@ import ListItem from '@mui/material/ListItem';
 
 function EditableList() {
     const auth = useAuth();
-    const userName = auth.user?.profile?.name || auth.user?.profile?.email || 'User';
+    const userName = auth.user?.profile?.username || auth.user?.profile?.email || 'User';
     const [inputValue, setInputValue] = useState('');
     const [items, setItems] = useState([]);
     const [editingIndex, setEditingIndex] = useState(null);
@@ -27,50 +27,69 @@ function EditableList() {
     // API endpoint for S3 operations
     const S3_API_BASE = "https://q5c7u5zmzc4l7r4warc6oslx4e0bgoqd.lambda-url.us-east-2.on.aws/api/s3";
     
-    // Load wedding list from S3
-    const loadWeddingsFromServer = async () => {
-        setLoading(true);
-        try {
-            const response = await fetch(`${S3_API_BASE}/list`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
-            
-            // Extract wedding names from the file list
-            // API returns array of objects: [{ fileName: "wedding1.json", size: 12345, lastModified: "..." }]
-            const weddingNames = data
-                .filter(fileObj => fileObj.fileName && fileObj.fileName.endsWith('.json'))
-                .map(fileObj => fileObj.fileName.replace('.json', ''));
-            
-            setItems(weddingNames);
-        } catch (error) {
-            console.error('Error loading weddings from server:', error);
-            // Fallback to localStorage if server is unavailable
-            const storedItems = JSON.parse(localStorage.getItem('weddingItems')) || [];
-            setItems(storedItems);
-            alert('Could not connect to server. Using local data.');
-        } finally {
-            setLoading(false);
-        }
-    };
+    // Load wedding list from S3 (in useEffect below)
     
     useEffect(() => {
+        const loadWeddingsFromServer = async () => {
+            setLoading(true);
+            try {
+                // If backend supports server-side filtering, pass the owner email as a query param
+                const ownerId = auth.user?.profile?.email || null;
+                const listUrl = ownerId ? `${S3_API_BASE}/list?ownerMail=${encodeURIComponent(ownerId)}` : `${S3_API_BASE}/list`;
+                const response = await fetch(listUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+
+                let filtered = data.filter(fileObj => fileObj.fileName && fileObj.fileName.endsWith('.json'));
+
+                // If server provides owner metadata, limit to files owned by the current user
+                if (ownerId && filtered.some(f => f.owner || f['x-amz-meta-owner'])) {
+                    filtered = filtered.filter(f => (f.owner === ownerId) || (f['x-amz-meta-owner'] === ownerId));
+                }
+
+                const weddingNames = filtered.map(fileObj => fileObj.fileName.replace('.json', ''));
+
+                setItems(weddingNames);
+            } catch (error) {
+                console.error('Error loading weddings from server:', error);
+                // Fallback to localStorage if server is unavailable
+                const storedItems = JSON.parse(localStorage.getItem('weddingItems')) || [];
+                setItems(storedItems);
+                alert('Could not connect to server. Using local data.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
         loadWeddingsFromServer();
-    }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [auth.user]);
     
-    // Save wedding to S3
+    // Save wedding to S3 (include owner metadata if available)
     const saveWeddingToServer = async (weddingName, weddingData) => {
         try {
+            // Attach owner identifier if available
+            const ownerId = auth.user?.profile?.email || null;
+
+            const payload = {
+                fileName: `${weddingName}.json`,
+                data: weddingData
+            };
+
+            // send owner metadata as both 'owner' and 'x-amz-meta-owner' for backend compatibility
+            if (ownerId) {
+                payload.owner = ownerId;
+                payload['x-amz-meta-owner'] = ownerId;
+            }
+
             const response = await fetch(`${S3_API_BASE}/upload`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    fileName: `${weddingName}.json`,
-                    data: weddingData
-                })
+                body: JSON.stringify(payload)
             });
             
             if (!response.ok) {
@@ -87,14 +106,19 @@ function EditableList() {
     // Delete wedding from S3
     const deleteWeddingFromServer = async (weddingName) => {
         try {
+            const ownerId = auth.user?.profile?.email || null;
+            const payload = { fileName: `${weddingName}.json` };
+            if (ownerId) {
+                payload.owner = ownerId;
+                payload['x-amz-meta-owner'] = ownerId;
+            }
+
             const response = await fetch(`${S3_API_BASE}/delete`, {
                 method: 'DELETE',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    fileName: `${weddingName}.json`
-                })
+                body: JSON.stringify(payload)
             });
             
             if (!response.ok) {
@@ -115,7 +139,7 @@ function EditableList() {
             
             if (editingIndex !== null) {
                 // Handle editing - this would require renaming on the server
-                const oldName = items[editingIndex];
+                // editingIndex present - preparing to update the existing item
                 const newItems = [...items];
                 newItems[editingIndex] = trimmed;
                 
@@ -545,6 +569,10 @@ function EditableList() {
 
     return (
         <div>
+            {/* Greeting bar */}
+            <div className="greetingBar">
+                Hello {userName}!
+            </div>
             {loading && items.length === 0 && (
                 <div style={{ textAlign: 'center', margin: '2rem', fontSize: '1.2rem', color: '#666' }}>
                     Loading weddings from server...

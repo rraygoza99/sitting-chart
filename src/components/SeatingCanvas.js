@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth } from 'react-oidc-context';
 import { useParams } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import Button from '@mui/material/Button';
@@ -33,6 +34,7 @@ import './SeatingCanvas.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 function SeatingCanvas({ guests = [] }) {
+    const auth = useAuth();
     const { name: weddingId } = useParams();
     const [tables, setTables] = useState([]);
     const [guestList, setGuestList] = useState([]);
@@ -108,6 +110,13 @@ function SeatingCanvas({ guests = [] }) {
             // Create form data with the file
             const formData = new FormData();
             formData.append('file', jsonBlob, `${weddingName}.json`);
+            // Attach owner metadata if available
+            const ownerId = auth?.user?.profile?.sub || auth?.user?.profile?.email || null;
+            if (ownerId) {
+                // include both owner and x-amz-meta-owner for compatibility with S3 metadata
+                formData.append('owner', ownerId);
+                formData.append('x-amz-meta-owner', ownerId);
+            }
             
             const response = await fetch(`${S3_API_BASE}/upload`, {
                 method: 'POST',
