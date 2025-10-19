@@ -17,7 +17,7 @@ function EditableList() {
     const userName = auth.user?.profile?.username || auth.user?.profile?.email || 'User';
     const [inputValue, setInputValue] = useState('');
     const [items, setItems] = useState([]);
-    const [editingIndex, setEditingIndex] = useState(null);
+    // editingIndex removed — edit flow is no longer supported
     const [csvModalOpen, setCsvModalOpen] = useState(false);
     const [csvWeddingName, setCsvWeddingName] = useState('');
     const [csvFile, setCsvFile] = useState(null);
@@ -73,29 +73,34 @@ function EditableList() {
             // Attach owner identifier if available
             const ownerId = auth.user?.profile?.email || null;
 
-            const payload = {
-                fileName: `${weddingName}.json`,
-                data: weddingData
-            };
+            // Create a JSON blob and send as multipart/form-data so the backend can handle file uploads
+            const jsonBlob = new Blob([JSON.stringify(weddingData)], { type: 'application/json' });
+            const formData = new FormData();
+            formData.append('file', jsonBlob, `${weddingName}.json`);
+            // Also include the fileName explicitly in case backend expects it as a field
+            formData.append('fileName', `${weddingName}.json`);
 
-            // send owner metadata as both 'owner' and 'x-amz-meta-owner' for backend compatibility
+            // include owner fields for backend compatibility
             if (ownerId) {
-                payload.owner = ownerId;
-                payload['x-amz-meta-owner'] = ownerId;
+                formData.append('owner', ownerId);
+                formData.append('x-amz-meta-owner', ownerId);
+                // Provide a metadata JSON payload the backend can use to set S3 object metadata
+                formData.append('metadata', JSON.stringify({ 'x-amz-meta-owner': ownerId }));
             }
+
+            const headers = {};
+            if (ownerId) headers['ownerMail'] = ownerId;
 
             const response = await fetch(`${S3_API_BASE}/upload`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload)
+                headers,
+                body: formData // let browser set Content-Type including boundary
             });
-            
+
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            
+
             return true;
         } catch (error) {
             console.error('Error saving wedding to server:', error);
@@ -133,88 +138,52 @@ function EditableList() {
     };
     
     const handleAddClick = async () => {
+        const ownerId = auth.user?.profile?.email || null;
         const trimmed = inputValue.trim();
         if (trimmed && !trimmed.includes(' ')) {
             setLoading(true);
-            
-            if (editingIndex !== null) {
-                // Handle editing - this would require renaming on the server
-                // editingIndex present - preparing to update the existing item
-                const newItems = [...items];
-                newItems[editingIndex] = trimmed;
-                
-                // For editing, we would need to implement a rename operation
-                // For now, let's treat this as creating a new wedding
-                const emptyWeddingData = {
-                    weddingName: trimmed,
-                    exportDate: new Date().toISOString(),
-                    totalGuests: 0,
-                    totalTables: 0,
-                    guestList: [],
-                    tables: [],
-                    tableAliases: {},
-                    tableSizes: {},
-                    tableNumbers: {},
-                    metadata: {
-                        viewMode: "list",
-                        isGrouped: true,
-                        version: "1.0"
-                    }
-                };
-                
-                const success = await saveWeddingToServer(trimmed, emptyWeddingData);
-                if (success) {
-                    setItems(newItems);
-                    // Also update localStorage as backup
-                    localStorage.setItem('weddingItems', JSON.stringify(newItems));
-                    setEditingIndex(null);
-                } else {
-                    alert('Failed to save wedding to server. Please try again.');
-                }
-            } else {
-                if (!items.includes(trimmed)) {
-                    // Create empty wedding data
-                    const emptyWeddingData = {
-                        weddingName: trimmed,
-                        exportDate: new Date().toISOString(),
-                        totalGuests: 0,
-                        totalTables: 0,
-                        guestList: [],
-                        tables: [],
-                        tableAliases: {},
-                        tableSizes: {},
-                        tableNumbers: {},
-                        metadata: {
-                            viewMode: "list",
-                            isGrouped: true,
-                            version: "1.0"
-                        }
-                    };
-                    
-                    const success = await saveWeddingToServer(trimmed, emptyWeddingData);
-                    if (success) {
-                        const newItems = [...items, trimmed];
-                        setItems(newItems);
-                        // Also update localStorage as backup
-                        localStorage.setItem('weddingItems', JSON.stringify(newItems));
-                    } else {
-                        alert('Failed to save wedding to server. Please try again.');
-                    }
-                } else {
-                    alert('Wedding name already exists!');
-                }
+
+            if (items.includes(trimmed)) {
+                alert('Wedding name already exists!');
+                setLoading(false);
+                return;
             }
-            
+
+            // Create empty wedding data
+            const emptyWeddingData = {
+                weddingName: trimmed,
+                exportDate: new Date().toISOString(),
+                totalGuests: 0,
+                totalTables: 0,
+                guestList: [],
+                tables: [],
+                tableAliases: {},
+                tableSizes: {},
+                tableNumbers: {},
+                metadata: {
+                    viewMode: "list",
+                    isGrouped: true,
+                    version: "1.0",
+                    // include owner email in the file metadata for clarity
+                    'x-amz-meta-owner': ownerId
+                }
+            };
+
+            const success = await saveWeddingToServer(trimmed, emptyWeddingData);
+            if (success) {
+                const newItems = [...items, trimmed];
+                setItems(newItems);
+                // Also update localStorage as backup
+                localStorage.setItem('weddingItems', JSON.stringify(newItems));
+            } else {
+                alert('Failed to save wedding to server. Please try again.');
+            }
+
             setLoading(false);
             setInputValue('');
         } else {
             alert('Please enter a valid wedding name (no spaces allowed)');
         }
-    };
-
-    const handleEditClick = (index) => {
-        setInputValue(items[index]);
-        setEditingIndex(index);
     };
 
     const handleDeleteClick = async (weddingName) => {
@@ -598,7 +567,7 @@ function EditableList() {
                     onClick={handleAddClick}
                     disabled={loading}
                 >
-                    {loading ? 'Saving...' : (editingIndex !== null ? 'Update' : 'Add')}
+                    {loading ? 'Saving...' : 'Add'}
                 </Button>
             </div>
             
@@ -641,12 +610,6 @@ function EditableList() {
                                 disabled={loading}
                             >
                                 Open
-                            </Button>
-                            <Button 
-                                onClick={() => handleEditClick(index)}
-                                disabled={loading}
-                            >
-                                Edit
                             </Button>
                             <Button 
                                 onClick={() => handleDeleteClick(item)}

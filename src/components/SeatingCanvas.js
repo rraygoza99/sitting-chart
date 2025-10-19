@@ -110,16 +110,24 @@ function SeatingCanvas({ guests = [] }) {
             // Create form data with the file
             const formData = new FormData();
             formData.append('file', jsonBlob, `${weddingName}.json`);
+            // Also include the fileName explicitly
+            formData.append('fileName', `${weddingName}.json`);
             // Attach owner metadata if available
             const ownerId = auth?.user?.profile?.sub || auth?.user?.profile?.email || null;
             if (ownerId) {
                 // include both owner and x-amz-meta-owner for compatibility with S3 metadata
                 formData.append('owner', ownerId);
                 formData.append('x-amz-meta-owner', ownerId);
+                // Provide a metadata JSON payload the backend can use to set S3 object metadata
+                formData.append('metadata', JSON.stringify({ 'x-amz-meta-owner': ownerId }));
             }
             
+            const headers = {};
+            if (ownerId) headers['ownerMail'] = ownerId;
+
             const response = await fetch(`${S3_API_BASE}/upload`, {
                 method: 'POST',
+                headers,
                 body: formData // Don't set Content-Type header, let browser set it for FormData
             });
             
