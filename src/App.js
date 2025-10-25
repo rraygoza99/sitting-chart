@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { useAuth } from 'react-oidc-context';
 import EditableList from './components/buttonAddWedding/EditableList';
 import './App.css';
@@ -12,24 +12,33 @@ function App() {
     if (auth) {
       console.log('Auth status:', { isLoading: auth.isLoading, isAuthenticated: auth.isAuthenticated, user: auth.user, error: auth.error });
     }
+  const router = createBrowserRouter([
+    {
+      path: '/login',
+      element: <Login />,
+    },
+    {
+      path: '/',
+      element: (
+        <ProtectedRoute>
+          <EditableList />
+        </ProtectedRoute>
+      ),
+    },
+    {
+      path: '/wedding/:name',
+      element: (
+        <ProtectedRoute>
+          <SeatingCanvas />
+        </ProtectedRoute>
+      ),
+    },
+  ]);
+
   return (
-    <BrowserRouter>
-      <div className="App">
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/" element={
-            <ProtectedRoute>
-              <EditableList />
-            </ProtectedRoute>
-          } />
-          <Route path="/wedding/:name" element={
-            <ProtectedRoute>
-              <SeatingCanvas />
-            </ProtectedRoute>
-          } />
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <div className="App">
+      <RouterProvider router={router} />
+    </div>
   );
 }
 

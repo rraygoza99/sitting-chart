@@ -26,6 +26,7 @@ const ConfigurationModal = ({
     const [open, setOpen] = useState(false);
     const [defaultTableSize, setDefaultTableSize] = useState(10);
     const [language, setLanguage] = useState('english'); // 'english' or 'spanish'
+    const S3_API_BASE = "https://q5c7u5zmzc4l7r4warc6oslx4e0bgoqd.lambda-url.us-east-2.on.aws/api/s3";
     
     // Use translation hook
     const { t } = useSeatingTranslation(currentLanguage);
@@ -62,6 +63,40 @@ const ConfigurationModal = ({
         }
         
         setOpen(false);
+    };
+
+    // Share (add user) state and handler
+    const [newEmail, setNewEmail] = useState('');
+    const [shareLoading, setShareLoading] = useState(false);
+
+    const handleShare = async () => {
+        if (!weddingId) {
+            alert('No file selected to share.');
+            return;
+        }
+        const email = newEmail.trim();
+        if (!email) {
+            alert('Please enter a valid email address.');
+            return;
+        }
+
+        setShareLoading(true);
+        try {
+            const fileName = `${weddingId}.json`;
+            const shareUrl = `${S3_API_BASE}/share/${encodeURIComponent(fileName)}?newEmail=${encodeURIComponent(email)}`;
+            const response = await fetch(shareUrl, { method: 'POST' });
+            if (!response.ok) {
+                const text = await response.text().catch(() => '');
+                throw new Error(text || `HTTP ${response.status}`);
+            }
+            alert(`Successfully shared ${fileName} with ${email}`);
+            setNewEmail('');
+        } catch (err) {
+            console.error('Error sharing file:', err);
+            alert('Failed to share file. ' + (err.message || ''));
+        } finally {
+            setShareLoading(false);
+        }
     };
 
     const handleTableSizeChange = (event) => {
@@ -133,6 +168,32 @@ const ConfigurationModal = ({
                         <IconButton onClick={handleClose} size="small">
                             <CloseIcon />
                         </IconButton>
+                    </Box>
+
+                    {/* Add user / Share section */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 2 }}>
+                            Add user
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                            <TextField
+                                placeholder="Email..."
+                                value={newEmail}
+                                onChange={(e) => setNewEmail(e.target.value)}
+                                size="small"
+                                sx={{ flex: 1 }}
+                            />
+                            <Button
+                                variant="contained"
+                                onClick={handleShare}
+                                disabled={shareLoading || !newEmail.trim() || !weddingId}
+                            >
+                                {shareLoading ? 'Sharing...' : 'Share'}
+                            </Button>
+                        </Box>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                            Enter an email address to grant access to the current arrangement file.
+                        </Typography>
                     </Box>
                     
                     <Typography variant="body1" sx={{ mb: 3 }}>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from 'react-oidc-context';
-import { useParams } from 'react-router-dom';
+import { useParams, useBlocker } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
@@ -157,6 +157,37 @@ function SeatingCanvas({ guests = [] }) {
         }
         return 10; // Default fallback
     }, []);
+
+    // Warn user when attempting to reload/close tab if there are unsaved changes
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (!hasUnsavedChanges) return;
+            // Modern browsers will show a generic confirmation dialog; custom text is ignored
+            e.preventDefault();
+            e.returnValue = '';
+            return '';
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [hasUnsavedChanges]);
+
+    // Block in-app route changes if there are unsaved changes
+    const blocker = useBlocker(hasUnsavedChanges);
+    useEffect(() => {
+        if (blocker.state === 'blocked') {
+            const confirmLeave = window.confirm(
+                t ? t('unsavedChangesConfirm') || 'You have unsaved changes. Leave this page?' : 'You have unsaved changes. Leave this page?'
+            );
+            if (confirmLeave) {
+                blocker.proceed();
+            } else {
+                blocker.reset();
+            }
+        }
+    }, [blocker, t]);
 
     const handleCloseAlert = () => setAlertOpen(false);
     
