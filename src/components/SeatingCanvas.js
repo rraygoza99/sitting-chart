@@ -113,7 +113,7 @@ function SeatingCanvas({ guests = [] }) {
             // Also include the fileName explicitly
             formData.append('fileName', `${weddingName}.json`);
             // Attach owner metadata if available
-            const ownerId = auth?.user?.profile?.sub || auth?.user?.profile?.email || null;
+            const ownerId = auth?.user?.profile?.email || null;
             if (ownerId) {
                 // include both owner and x-amz-meta-owner for compatibility with S3 metadata
                 formData.append('owner', ownerId);
