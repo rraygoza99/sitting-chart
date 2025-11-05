@@ -4,6 +4,7 @@ export const englishTranslations = {
     'save': 'Save',
     'cancel': 'Cancel',
     'delete': 'Delete',
+    'open': 'Open',
     'edit': 'Edit',
     'add': 'Add',
     'remove': 'Remove',
@@ -14,6 +15,8 @@ export const englishTranslations = {
     'export': 'Export',
     'import': 'Import',
     'loading': 'Loading...',
+    'saving': 'Saving...',
+    'deleting': 'Deleting...',
     'error': 'Error',
     'success': 'Success',
     'warning': 'Warning',
@@ -216,6 +219,22 @@ export const englishTranslations = {
     'ariaLabelSearch': 'Search guests',
     'ariaLabelGuestCheckbox': 'Select guest',
     'ariaLabelGroupCheckbox': 'Select all guests in group',
+    
+    // EditableList and related components
+    'helloUser': 'Hello {name}!',
+    'createNewWeddingTitle': 'Create a new wedding',
+    'createNewWeddingDesc': 'Enter a unique name (no spaces) to create a new wedding arrangement.',
+    'enterWeddingNamePlaceholder': 'Enter wedding name',
+    'availableWeddings': 'Available weddings',
+    'noWeddingsYet': 'No weddings yet. Create your first one above.',
+    'loadingWeddings': 'Loading weddings from server...',
+    'deleteWeddingTitle': 'Delete wedding',
+    'deleteWeddingConfirm': 'Are you sure you want to delete "{name}"?',
+    'createdWedding': 'Created "{name}"',
+    'deletedWedding': 'Deleted "{name}"',
+    'usingLocalData': 'Could not connect to server. Using local data.',
+    'failedDeleteWedding': 'Failed to delete wedding. Please try again.',
+    'failedSaveWedding': 'Failed to save wedding. Please try again.',
 };
 
 export default englishTranslations;

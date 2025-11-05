@@ -4,6 +4,7 @@ export const spanishTranslations = {
     'save': 'Guardar',
     'cancel': 'Cancelar',
     'delete': 'Eliminar',
+    'open': 'Abrir',
     'edit': 'Editar',
     'add': 'Agregar',
     'remove': 'Remover',
@@ -14,6 +15,8 @@ export const spanishTranslations = {
     'export': 'Exportar',
     'import': 'Importar',
     'loading': 'Cargando...',
+    'saving': 'Guardando...',
+    'deleting': 'Eliminando...',
     'error': 'Error',
     'success': 'Éxito',
     'warning': 'Advertencia',
@@ -216,6 +219,22 @@ export const spanishTranslations = {
     'ariaLabelSearch': 'Buscar invitados',
     'ariaLabelGuestCheckbox': 'Seleccionar invitado',
     'ariaLabelGroupCheckbox': 'Seleccionar todos los invitados del grupo',
+    
+    // EditableList and related components
+    'helloUser': '¡Hola {name}!',
+    'createNewWeddingTitle': 'Crear una nueva boda',
+    'createNewWeddingDesc': 'Ingresa un nombre único (sin espacios) para crear un nuevo arreglo.',
+    'enterWeddingNamePlaceholder': 'Ingresa el nombre de la boda',
+    'availableWeddings': 'Bodas disponibles',
+    'noWeddingsYet': 'Aún no hay bodas. Crea la primera arriba.',
+    'loadingWeddings': 'Cargando bodas desde el servidor...',
+    'deleteWeddingTitle': 'Eliminar boda',
+    'deleteWeddingConfirm': '¿Seguro que deseas eliminar "{name}"?',
+    'createdWedding': 'Creada "{name}"',
+    'deletedWedding': 'Eliminada "{name}"',
+    'usingLocalData': 'No se pudo conectar al servidor. Usando datos locales.',
+    'failedDeleteWedding': 'No se pudo eliminar la boda. Inténtalo de nuevo.',
+    'failedSaveWedding': 'No se pudo guardar la boda. Inténtalo de nuevo.',
 };
 
 export default spanishTranslations;

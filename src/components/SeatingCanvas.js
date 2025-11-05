@@ -4,8 +4,6 @@ import { useParams, useBlocker } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import Button from '@mui/material/Button';
 import ButtonGroup from '@mui/material/ButtonGroup';
-import Alert from '@mui/material/Alert';
-import Snackbar from '@mui/material/Snackbar';
 import Icon from '@mui/material/Icon';
 import IconButton from '@mui/material/IconButton';
 import CloseIcon from '@mui/icons-material/Close';
@@ -32,6 +30,9 @@ import GroupIcon from '@mui/icons-material/Group';
 import ChildFriendlyIcon from '@mui/icons-material/ChildFriendly';
 import './SeatingCanvas.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
+import { useNotification } from './common/NotificationProvider';
+import { getWedding, saveWedding } from '../utils/weddingsService';
+import { addGuestsUnique, dedupeGuests } from '../utils/guests';
 
 function SeatingCanvas({ guests = [] }) {
     const auth = useAuth();
@@ -41,9 +42,7 @@ function SeatingCanvas({ guests = [] }) {
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'visual'
     const [isGrouped, setIsGrouped] = useState(true);
     const [selectedGuests, setSelectedGuests] = useState(new Set());
-    const [alertMessage, setAlertMessage] = useState('');
-    const [alertOpen, setAlertOpen] = useState(false);
-    const [alertSeverity, setAlertSeverity] = useState('success');
+    const notify = useNotification();
     const [editModalOpen, setEditModalOpen] = useState(false);
     const [editingGuest, setEditingGuest] = useState(null);
     const [editFirstName, setEditFirstName] = useState('');
@@ -77,67 +76,28 @@ function SeatingCanvas({ guests = [] }) {
     // Translation hook
     const { t } = useSeatingTranslation(currentLanguage);
 
-    // API endpoint for S3 operations
-    const S3_API_BASE = "https://q5c7u5zmzc4l7r4warc6oslx4e0bgoqd.lambda-url.us-east-2.on.aws/api/s3";
-
-    // Load wedding data from S3
+    // Load and save via service
     const loadWeddingFromServer = async (weddingName) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${S3_API_BASE}/file/${weddingName}.json`);
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const data = await response.json();
+            const data = await getWedding(weddingName);
             return data;
-        } catch (error) {
-            console.error('Error loading wedding from server:', error);
+        } catch (e) {
+            console.error('Error loading wedding from server:', e);
             return null;
         } finally {
             setIsLoading(false);
         }
     };
 
-    // Save wedding data to S3
     const saveWeddingToServer = async (weddingName, weddingData) => {
         setIsLoading(true);
         try {
-            // Create a JSON blob as a file
-            const jsonBlob = new Blob([JSON.stringify(weddingData)], { 
-                type: 'application/json' 
-            });
-            
-            // Create form data with the file
-            const formData = new FormData();
-            formData.append('file', jsonBlob, `${weddingName}.json`);
-            // Also include the fileName explicitly
-            formData.append('fileName', `${weddingName}.json`);
-            // Attach owner metadata if available
-            const ownerId = auth?.user?.profile?.email || null;
-            if (ownerId) {
-                // include both owner and x-amz-meta-owner for compatibility with S3 metadata
-                formData.append('owner', ownerId);
-                formData.append('x-amz-meta-owner', ownerId);
-                // Provide a metadata JSON payload the backend can use to set S3 object metadata
-                formData.append('metadata', JSON.stringify({ 'x-amz-meta-owner': ownerId }));
-            }
-            
-            const headers = {};
-            if (ownerId) headers['ownerMail'] = ownerId;
-
-            const response = await fetch(`${S3_API_BASE}/upload`, {
-                method: 'POST',
-                headers,
-                body: formData // Don't set Content-Type header, let browser set it for FormData
-            });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
+            const ownerId = auth?.user?.profile?.email || undefined;
+            await saveWedding(weddingName, weddingData, ownerId);
             return true;
-        } catch (error) {
-            console.error('Error saving wedding to server:', error);
+        } catch (e) {
+            console.error('Error saving wedding to server:', e);
             return false;
         } finally {
             setIsLoading(false);
@@ -189,7 +149,7 @@ function SeatingCanvas({ guests = [] }) {
         }
     }, [blocker, t]);
 
-    const handleCloseAlert = () => setAlertOpen(false);
+    // Notifications are global; no local alert close handler needed.
     
     // Load wedding data from server
     useEffect(() => {
@@ -261,7 +221,8 @@ function SeatingCanvas({ guests = [] }) {
                     safeTables = [];
                 }
                 
-                setGuestList(loadedGuestList);
+                // Ensure no duplicates in loaded guest list
+                setGuestList(dedupeGuests(loadedGuestList));
                 setTableAliases(loadedTableAliases);
                 setTableSizes(loadedTableSizes);
                 setTableNumbers(loadedTableNumbers);
@@ -280,9 +241,7 @@ function SeatingCanvas({ guests = [] }) {
                 setHasUnsavedChanges(false);
             } else {
                 // Server failed to load data - show error message
-                setAlertMessage('Failed to load wedding data from server. Please check your connection and try again.');
-                setAlertSeverity('error');
-                setAlertOpen(true);
+                notify.error('Failed to load wedding data from server. Please check your connection and try again.');
                 
                 // Initialize with empty state
                 const initialGuestList = guests.map((guest, index) => ({
@@ -350,16 +309,12 @@ function SeatingCanvas({ guests = [] }) {
 
         updateTables(guestList.length + newGuests.length);
         
-        setAlertMessage(t('importSuccessful', { count: newGuests.length }));
-        setAlertSeverity('success');
-        setAlertOpen(true);
+    notify.success(t('importSuccessful', { count: newGuests.length }));
     };
 
 const saveArrangement = async () => {
         if (!weddingId) {
-            setAlertMessage('Cannot save: No wedding ID provided');
-            setAlertSeverity('error');
-            setAlertOpen(true);
+            notify.error('Cannot save: No wedding ID provided');
             return;
         }
 
@@ -387,14 +342,9 @@ const saveArrangement = async () => {
         if (success) {
             // Reset unsaved changes flag after successful save
             setHasUnsavedChanges(false);
-            
-            setAlertMessage(t('arrangementSaved'));
-            setAlertSeverity('success');
-            setAlertOpen(true);
+            notify.success(t('arrangementSaved'));
         } else {
-            setAlertMessage('Failed to save to server. Please check your connection and try again.');
-            setAlertSeverity('error');
-            setAlertOpen(true);
+            notify.error('Failed to save to server. Please check your connection and try again.');
         }
     };
 
@@ -421,9 +371,7 @@ const saveArrangement = async () => {
 
     const performUndo = () => {
         if (undoHistory.length === 0) {
-            setAlertMessage(t('noActionsToUndo'));
-            setAlertSeverity('info');
-            setAlertOpen(true);
+            notify.info(t('noActionsToUndo'));
             return;
         }
 
@@ -439,9 +387,7 @@ const saveArrangement = async () => {
         // Mark as having unsaved changes when undoing
         setHasUnsavedChanges(true);
 
-        setAlertMessage(t('undoAction', { action: lastState.action }));
-        setAlertSeverity('info');
-        setAlertOpen(true);
+    notify.info(t('undoAction', { action: lastState.action }));
     };
 
     const deleteArrangement = () => {
@@ -456,9 +402,7 @@ const saveArrangement = async () => {
         setTableSizes({}); // Reset table sizes
         setTableNumbers({}); // Reset table numbers
     setCustomGroups([]); // Reset custom groups
-        setAlertMessage(t('arrangementDeleted'));
-        setAlertSeverity('warning');
-        setAlertOpen(true);
+    notify.warning(t('arrangementDeleted'));
     };    const exportToPDF = () => {
         const doc = new jsPDF();
         doc.setFontSize(16);
@@ -682,9 +626,7 @@ const saveArrangement = async () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        setAlertMessage(t('arrangementExported'));
-        setAlertSeverity('success');
-        setAlertOpen(true);
+    notify.success(t('arrangementExported'));
     };
 
     const exportGuestTicketsToPDF = () => {
@@ -789,9 +731,7 @@ const saveArrangement = async () => {
         
         doc.save(`${weddingId || 'wedding'}_guest_tickets.pdf`);
         
-        setAlertMessage(t('guestTicketsExported'));
-        setAlertSeverity('success');
-        setAlertOpen(true);
+    notify.success(t('guestTicketsExported'));
     };
 
     // Export ticket information grouped by guest group
@@ -853,9 +793,7 @@ const saveArrangement = async () => {
 
         doc.save(`${weddingId || 'wedding'}_guest_tickets_by_group.pdf`);
 
-        setAlertMessage(t('guestTicketsByGroupExported'));
-        setAlertSeverity('success');
-        setAlertOpen(true);
+    notify.success(t('guestTicketsByGroupExported'));
     };
 
     const downloadSampleCSV = () => {
@@ -887,9 +825,7 @@ const saveArrangement = async () => {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        setAlertMessage(t('sampleCSVDownloaded'));
-        setAlertSeverity('info');
-        setAlertOpen(true);
+    notify.info(t('sampleCSVDownloaded'));
     };
 
     const toggleViewMode = () => {
@@ -930,15 +866,13 @@ const saveArrangement = async () => {
 
         setGuestList(prevGuestList => {
             let updatedGuestList = [...prevGuestList];
-            
             guestsToMove.forEach(guestToMove => {
                 const guestFromTableIndex = parseInt(guestToMove.fromTableIndex, 10);
                 if (isNaN(guestFromTableIndex)) {
                     updatedGuestList = updatedGuestList.filter(unassigned => unassigned.id !== guestToMove.id);
                 }
             });
-            
-            return updatedGuestList;
+            return dedupeGuests(updatedGuestList);
         });
 
         if (isMultiDrag) {
@@ -979,15 +913,11 @@ const saveArrangement = async () => {
             });
 
             setGuestList(prevGuestList => {
-                const updatedGuestList = [...prevGuestList];
-                
-                guestsToMove.forEach(guestToMove => {
-                    // Remove the fromTableIndex property before adding back to guest list
-                    const { fromTableIndex, ...cleanGuest } = guestToMove;
-                    updatedGuestList.push(cleanGuest);
+                const cleaned = guestsToMove.map(g => {
+                    const { fromTableIndex, ...cleanGuest } = g;
+                    return cleanGuest;
                 });
-                
-                return updatedGuestList;
+                return addGuestsUnique(prevGuestList, cleaned);
             });
 
             if (isMultiDrag) {
@@ -1006,7 +936,7 @@ const saveArrangement = async () => {
             return updatedTables;
         });
 
-        setGuestList(prevGuestList => [...prevGuestList, guest]);
+    setGuestList(prevGuestList => addGuestsUnique(prevGuestList, guest));
     };
 
     // Clear all guests from a specific table
@@ -1029,7 +959,7 @@ const saveArrangement = async () => {
         });
         
         // Then add all guests back to guest list
-        setGuestList(prevGuestList => [...prevGuestList, ...guestsToMove]);
+    setGuestList(prevGuestList => addGuestsUnique(prevGuestList, guestsToMove));
     };
 
     // Add a new empty table
@@ -1356,9 +1286,7 @@ const saveArrangement = async () => {
         hideContextMenu();
         setHasUnsavedChanges(true);
         
-        setAlertMessage(`Successfully changed group for ${selectedGuests.size} guest(s) to "${trimmed}"`);
-        setAlertSeverity('success');
-        setAlertOpen(true);
+    notify.success(`Successfully changed group for ${selectedGuests.size} guest(s) to "${trimmed}"`);
     };
 
     const openNewGroupModal = () => {
@@ -1537,9 +1465,7 @@ const saveArrangement = async () => {
         );
         
         if (validGuests.length === 0) {
-            setAlertMessage(t('pleaseAddGuest'));
-            setAlertSeverity('warning');
-            setAlertOpen(true);
+            notify.warning(t('pleaseAddGuest'));
             return;
         }
 
@@ -1556,9 +1482,7 @@ const saveArrangement = async () => {
         updateTables(guestList.length + guestsToAdd.length);
     setHasUnsavedChanges(true);
         
-        setAlertMessage(t('guestAdded', { count: guestsToAdd.length }));
-        setAlertSeverity('success');
-        setAlertOpen(true);
+    notify.success(t('guestAdded', { count: guestsToAdd.length }));
         
         closeAddGuestsModal();
     };
@@ -2179,11 +2103,7 @@ const saveArrangement = async () => {
                 </Box>
             </Modal>
 
-            <Snackbar open={alertOpen} autoHideDuration={3000} onClose={handleCloseAlert}>
-                <Alert onClose={handleCloseAlert} severity={alertSeverity}>
-                    {alertMessage}
-                </Alert>
-            </Snackbar>            
+            {/* Notifications handled globally by NotificationProvider */}
             <div className="guestList"
                 onDragOver={(e) => {
                     e.preventDefault();

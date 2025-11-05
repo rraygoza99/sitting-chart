@@ -5,6 +5,7 @@ import './App.css';
 import SeatingCanvas from './components/SeatingCanvas';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import { NotificationProvider } from './components/common/NotificationProvider';
 
 function App() {
     const auth = useAuth();
@@ -37,7 +38,9 @@ function App() {
 
   return (
     <div className="App">
-      <RouterProvider router={router} />
+      <NotificationProvider>
+        <RouterProvider router={router} />
+      </NotificationProvider>
     </div>
   );
 }
