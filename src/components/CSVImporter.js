@@ -17,10 +17,43 @@ function CSVImporter({ onImport, existingGuests = [], existingTables = [] }) {
         const file = event.target.files[0];
         if (!file) return;
 
+        // Robust decoding for CSV files with various encodings (UTF-8, Windows-1252/Latin-1)
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const csvData = e.target.result;
+                const buffer = e.target.result;
+                let csvData = '';
+                if (typeof TextDecoder !== 'undefined') {
+                    const bytes = new Uint8Array(buffer);
+                    const encodings = ['utf-8', 'windows-1252', 'iso-8859-1'];
+                    let best = { text: '', replacements: Number.MAX_SAFE_INTEGER, encoding: 'utf-8' };
+                    for (const enc of encodings) {
+                        try {
+                            const decoder = new TextDecoder(enc, { fatal: false });
+                            let text = decoder.decode(bytes);
+                            // Strip BOM if present
+                            if (text.charCodeAt(0) === 0xFEFF) {
+                                text = text.slice(1);
+                            }
+                            const replacements = (text.match(/\uFFFD/g) || []).length;
+                            if (replacements < best.replacements) {
+                                best = { text, replacements, encoding: enc };
+                            }
+                        } catch (err) {
+                            // Skip unsupported encodings
+                        }
+                    }
+                    csvData = best.text;
+                    console.log('CSV decoded using', best.encoding);
+                } else {
+                    // Fallback for very old environments
+                    const readerText = new FileReader();
+                    readerText.onload = ev => {
+                        csvData = ev.target.result || '';
+                    };
+                    readerText.readAsText(file, 'utf-8');
+                }
+
                 console.log('Raw CSV data:', csvData); // Debug log
                 
                 const rows = csvData.split('\n')
@@ -127,7 +160,8 @@ function CSVImporter({ onImport, existingGuests = [], existingTables = [] }) {
                 alert('Error processing CSV file. Please check the format.');
             }
         };
-        reader.readAsText(file);
+        // Read as ArrayBuffer to allow manual decoding with TextDecoder
+        reader.readAsArrayBuffer(file);
     };    return (
         <div>
             <input
