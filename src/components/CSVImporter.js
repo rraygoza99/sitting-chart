@@ -1,29 +1,16 @@
 import React, { useRef } from 'react';
 import Button from '@mui/material/Button'; // Import Material-UI Button
 import './SeatingCanvas.css'; // Import your CSS file for styling
+import { generateUniqueGuestId } from '../utils/guests';
 
 function CSVImporter({ onImport, existingGuests = [], existingTables = [] }) {
     const fileInputRef = useRef();
 
-    // Helper function to get the next available guest ID
-    const getNextGuestId = (startingId = 1) => {
-        const allGuests = [...existingGuests, ...existingTables.flat()];
-        let maxId = startingId - 1;
-        
-        allGuests.forEach(guest => {
-            const id = guest.id;
-            if (typeof id === 'string') {
-                const numericPart = id.match(/(\d+)/);
-                if (numericPart) {
-                    const num = parseInt(numericPart[1], 10);
-                    if (num > maxId) maxId = num;
-                }
-            } else if (typeof id === 'number') {
-                if (id > maxId) maxId = id;
-            }
-        });
-        
-        return maxId + 1;
+    // Reserve a new GUID that doesn't collide with existing ones
+    const reserveGuid = (existingIds) => {
+        const id = generateUniqueGuestId(existingIds);
+        existingIds.add(id);
+        return id;
     };
 
     const handleFileUpload = (event) => {
@@ -42,19 +29,19 @@ function CSVImporter({ onImport, existingGuests = [], existingTables = [] }) {
                 
                 console.log('Parsed rows:', rows); // Debug log
                 
-                // Calculate starting ID based on existing guests
-                let nextId = getNextGuestId();
+                // Track existing IDs to avoid any collisions
+                const existingIds = new Set([...existingGuests, ...existingTables.flat()].map(g => String(g.id)));
                 
                 // First pass: Create a map to identify original guests and their +1, +2, etc.
-                const guestMap = new Map();
+                const guestMap = new Map(); // key: `${first}-${last}` -> guest object with GUID id
                 const plusOneGuests = [];
                 
                 rows.forEach((row, index) => {
                     const firstName = row[0] ? row[0].trim() : '';
                     const lastName = row[1] ? row[1].trim() : '';
                     const group = row[2] ? row[2].trim() : 'Ungrouped';
-                    // ID is now optional - if provided use it, otherwise generate it
-                    const providedId = row[3] ? row[3].trim() : null;
+                    // ID in CSV is ignored for uniqueness; we generate GUIDs consistently
+                    const providedId = null;
                     
                     // Check if this is a +1, +2, +3, etc. guest
                     const plusOneMatch = lastName.match(/^(.+?)\s+\+(\d+)$/);
@@ -79,8 +66,7 @@ function CSVImporter({ onImport, existingGuests = [], existingTables = [] }) {
                     } else {
                         // This is an original guest
                         const guestKey = `${firstName}-${lastName}`;
-                        const guestId = providedId || nextId++;
-                        
+                        const guestId = reserveGuid(existingIds);
                         guestMap.set(guestKey, {
                             firstName,
                             lastName,
@@ -98,20 +84,19 @@ function CSVImporter({ onImport, existingGuests = [], existingTables = [] }) {
                     
                     if (originalGuest) {
                         // Link this +1 guest to the original guest
-                        const plusOneId = plusOneGuest.providedId || `${originalGuest.id}-${plusOneGuest.plusNumber}`;
-                        
+                        const plusOneId = reserveGuid(existingIds);
                         processedGuests.push({
                             firstName: plusOneGuest.firstName,
                             lastName: plusOneGuest.lastName,
                             group: plusOneGuest.group,
                             originalGuestId: originalGuest.id,
+                            plusOneSequence: plusOneGuest.plusNumber,
                             id: plusOneId
                         });
                     } else {
                         // Original guest not found, treat as standalone guest
                         console.warn(`Original guest not found for +${plusOneGuest.plusNumber} guest:`, plusOneGuest);
-                        const standaloneId = plusOneGuest.providedId || nextId++;
-                        
+                        const standaloneId = reserveGuid(existingIds);
                         processedGuests.push({
                             firstName: plusOneGuest.firstName,
                             lastName: plusOneGuest.lastName,

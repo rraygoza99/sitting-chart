@@ -32,7 +32,8 @@ import './SeatingCanvas.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import { useNotification } from './common/NotificationProvider';
 import { getWedding, saveWedding } from '../utils/weddingsService';
-import { addGuestsUnique, dedupeGuests } from '../utils/guests';
+import { addGuestsUnique, dedupeGuests, normalizeGuestData, generateUniqueGuestId } from '../utils/guests';
+import { logSeating, findDuplicatesById, summarizeIds } from '../utils/debug';
 
 function SeatingCanvas({ guests = [] }) {
     const auth = useAuth();
@@ -75,6 +76,19 @@ function SeatingCanvas({ guests = [] }) {
     
     // Translation hook
     const { t } = useSeatingTranslation(currentLanguage);
+
+    // Helper to generate an initial guest list with GUID ids (avoids timestamp collisions)
+    const buildInitialGuestList = (incoming = []) => {
+        const existingIds = new Set();
+        return incoming.map(g => {
+            let id = g.id ? String(g.id) : null;
+            if (!id || existingIds.has(id)) {
+                id = generateUniqueGuestId(existingIds);
+            }
+            existingIds.add(id);
+            return { ...g, id };
+        });
+    };
 
     // Load and save via service
     const loadWeddingFromServer = async (weddingName) => {
@@ -156,10 +170,7 @@ function SeatingCanvas({ guests = [] }) {
         const loadWeddingData = async () => {
             if (!weddingId) {
                 // Handle case where there's no wedding ID
-                const initialGuestList = guests.map((guest, index) => ({
-                    ...guest,
-                    id: guest.id || `guest-${Date.now()}-${index}`,
-                }));
+                const initialGuestList = buildInitialGuestList(guests);
                 setGuestList(initialGuestList);
                 const totalGuests = guests.length;
                 const tableSize = getTableSize();
@@ -222,18 +233,21 @@ function SeatingCanvas({ guests = [] }) {
                 }
                 
                 // Ensure no duplicates in loaded guest list
-                setGuestList(dedupeGuests(loadedGuestList));
+                // Normalize IDs to avoid duplicate React keys (warning: duplicate key 'x')
+                const { guestList: normalizedList } = normalizeGuestData(dedupeGuests(loadedGuestList), []);
+                setGuestList(normalizedList);
                 setTableAliases(loadedTableAliases);
                 setTableSizes(loadedTableSizes);
                 setTableNumbers(loadedTableNumbers);
                 setCustomGroups(Array.isArray(loadedCustomGroups) ? loadedCustomGroups : []);
                 
                 // Check if we have guests but no tables (e.g., CSV import from home page)
-                if (loadedGuestList.length > 0 && safeTables.length === 0) {
+                if (normalizedList.length > 0 && safeTables.length === 0) {
                     const tableSize = getTableSize();
-                    const requiredTables = Math.ceil(loadedGuestList.length / tableSize);
+                    const requiredTables = Math.ceil(normalizedList.length / tableSize);
                     setTables(Array(requiredTables).fill([]));
                 } else {
+                    // Apply any remapped guest IDs to tables too (if future normalization includes them)
                     setTables(safeTables);
                 }
                 
@@ -244,11 +258,9 @@ function SeatingCanvas({ guests = [] }) {
                 notify.error('Failed to load wedding data from server. Please check your connection and try again.');
                 
                 // Initialize with empty state
-                const initialGuestList = guests.map((guest, index) => ({
-                    ...guest,
-                    id: guest.id || `guest-${Date.now()}-${index}`,
-                }));
-                setGuestList(initialGuestList);
+                const initialGuestList = buildInitialGuestList(guests);
+                const { guestList: normalizedInitial } = normalizeGuestData(dedupeGuests(initialGuestList), []);
+                setGuestList(normalizedInitial);
                 const totalGuests = guests.length;
                 const tableSize = getTableSize();
                 const requiredTables = Math.ceil(totalGuests / tableSize);
@@ -265,10 +277,7 @@ function SeatingCanvas({ guests = [] }) {
     }, [weddingId]);
     useEffect(() => {
         if (guests.length > 0 && guestList.length === 0) {
-            const initialGuestList = guests.map((guest, index) => ({
-                ...guest,
-                id: guest.id || `guest-${Date.now()}-${index}`,
-            }));
+            const initialGuestList = buildInitialGuestList(guests);
             setGuestList(initialGuestList);
         }
         
@@ -295,21 +304,22 @@ function SeatingCanvas({ guests = [] }) {
             setTables(prevTables => [...prevTables, ...Array(requiredTables - prevTables.length).fill([])]);
         }
     };    const handleCSVImport = (importedGuests) => {
-        const newGuests = importedGuests.map((guest, index) => ({
-            ...guest,
-            id: guest.id || `imported-guest-${Date.now()}-${index}`,
-        }));
-        
-        setGuestList(prevGuestList => {
-            const filteredNewGuests = newGuests.filter(newGuest => 
-                !prevGuestList.some(existing => existing.id === newGuest.id)
-            );
-            return [...prevGuestList, ...filteredNewGuests];
+        const existingIds = new Set([...guestList, ...tables.flat()].map(g => String(g.id)));
+        const newGuests = importedGuests.map((guest) => {
+            let id = guest.id ? String(guest.id) : null;
+            if (!id || existingIds.has(id)) {
+                id = generateUniqueGuestId(existingIds);
+            }
+            existingIds.add(id);
+            return { ...guest, id };
         });
-
+        setGuestList(prevGuestList => {
+            const merged = addGuestsUnique(prevGuestList, newGuests);
+            const { guestList: normalized } = normalizeGuestData(merged, tables);
+            return normalized;
+        });
         updateTables(guestList.length + newGuests.length);
-        
-    notify.success(t('importSuccessful', { count: newGuests.length }));
+        notify.success(t('importSuccessful', { count: newGuests.length }));
     };
 
 const saveArrangement = async () => {
@@ -839,7 +849,7 @@ const saveArrangement = async () => {
         
         const isMultiDrag = guest.isMultiDrag;
         const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
-        
+        console.log('Guests to move:', guestsToMove);
         // Save state before making changes
         if (isMultiDrag) {
             saveStateToHistory(`Moved ${guestsToMove.length} guests to table ${tableIndex + 1}`);
@@ -869,9 +879,25 @@ const saveArrangement = async () => {
             guestsToMove.forEach(guestToMove => {
                 const guestFromTableIndex = parseInt(guestToMove.fromTableIndex, 10);
                 if (isNaN(guestFromTableIndex)) {
-                    updatedGuestList = updatedGuestList.filter(unassigned => unassigned.id !== guestToMove.id);
+                    // Normalize id comparison to avoid string/number mismatch preventing removal
+                    updatedGuestList = updatedGuestList.filter(unassigned => String(unassigned.id) !== String(guestToMove.id));
                 }
             });
+            const dups = findDuplicatesById(updatedGuestList);
+            if (dups.length) {
+                logSeating('After handleDrop - duplicates detected (pre-dedupe)', {
+                    duplicates: dups,
+                    guestToMoveIds: guestsToMove.map(g => g.id),
+                    before: summarizeIds(prevGuestList),
+                    after: summarizeIds(updatedGuestList)
+                });
+            } else {
+                logSeating('After handleDrop - no duplicates', {
+                    guestToMoveIds: guestsToMove.map(g => g.id),
+                    before: summarizeIds(prevGuestList),
+                    after: summarizeIds(updatedGuestList)
+                });
+            }
             return dedupeGuests(updatedGuestList);
         });
 
@@ -913,6 +939,7 @@ const saveArrangement = async () => {
             });
 
             setGuestList(prevGuestList => {
+                console.log(prevGuestList);
                 const cleaned = guestsToMove.map(g => {
                     const { fromTableIndex, ...cleanGuest } = g;
                     return cleanGuest;
@@ -936,7 +963,11 @@ const saveArrangement = async () => {
             return updatedTables;
         });
 
-    setGuestList(prevGuestList => addGuestsUnique(prevGuestList, guest));
+            setGuestList(prevGuestList => {
+                const merged = addGuestsUnique(prevGuestList, guest);
+                const { guestList: normalized } = normalizeGuestData(merged, tables);
+                return normalized;
+            });
     };
 
     // Clear all guests from a specific table
@@ -959,7 +990,11 @@ const saveArrangement = async () => {
         });
         
         // Then add all guests back to guest list
-    setGuestList(prevGuestList => addGuestsUnique(prevGuestList, guestsToMove));
+        setGuestList(prevGuestList => {
+            const merged = addGuestsUnique(prevGuestList, guestsToMove);
+            const { guestList: normalized } = normalizeGuestData(merged, tables);
+            return normalized;
+        });
     };
 
     // Add a new empty table
@@ -995,50 +1030,43 @@ const saveArrangement = async () => {
             return updatedTables;
         });
     };*/
-    const getTotalTickets=(guestId)=>{
-        return guestList.filter(guest => guest.originalGuestId === guestId).length + 1; // +1 for the original guest
-    };
+    // (Legacy) getTotalTickets removed; sequencing now handled via explicit plusOneSequence / childSequence fields.
 
-    // Check if a guest ID can be used for adding +1 guests
-    const canAddPlusOne = (guestId) => {
-        const idStr = String(guestId);
-        // If it's just a number, allow it
-        if (!isNaN(parseInt(idStr, 10)) && isFinite(idStr)) {
-            return true;
-        }
-
-        return false;
-    };
+    // All guests can now have plus ones since IDs are GUIDs
+    const canAddPlusOne = () => true;
     const handleAddPlusOne = (guest) => {
-        // Track action and mark as unsaved
         saveStateToHistory(`Added +1 for ${guest.firstName} ${guest.lastName}`);
-        setGuestList(prevGuestList => [
-            ...prevGuestList,
-            {
-                firstName: `${guest.firstName}`,
-                lastName: `${guest.lastName} +1`,
-                group: guest.group,
-                originalGuestId: guest.id,
-                id: `${guest.id}-${getTotalTickets(guest.id)+1}`, // Unique ID based on original guest ID and count of tickets
-            },
-        ]);
+        const allGuests = [...guestList, ...tables.flat()];
+        const existingIds = new Set(allGuests.map(g => String(g.id)));
+        const existingPlusOnes = allGuests.filter(g => g.originalGuestId === guest.id && !g.isChild).length;
+        const plusOne = {
+            firstName: `${guest.firstName}`,
+            lastName: `${guest.lastName} +1`,
+            group: guest.group,
+            originalGuestId: guest.id,
+            plusOneSequence: existingPlusOnes + 1,
+            id: generateUniqueGuestId(existingIds)
+        };
+        setGuestList(prevGuestList => addGuestsUnique(prevGuestList, plusOne));
         updateTables(guestList.length + 1);
         setHasUnsavedChanges(true);
     };
 
     const handleAddChild = (guest) => {
         saveStateToHistory(`Added child for ${guest.firstName} ${guest.lastName}`);
-        setGuestList(prevGuestList => [
-            ...prevGuestList,
-            {
-                firstName: `${guest.firstName} ${guest.lastName}'s`,
-                lastName: `child`,
-                group: guest.group,
-                originalGuestId: guest.id,
-                id: `${guest.id}-child-${Date.now()}`,
-                isChild: true
-            },
-        ]);
+        const allGuests = [...guestList, ...tables.flat()];
+        const existingIds = new Set(allGuests.map(g => String(g.id)));
+        const existingChildren = allGuests.filter(g => g.originalGuestId === guest.id && g.isChild).length;
+        const childGuest = {
+            firstName: `${guest.firstName} ${guest.lastName}'s`,
+            lastName: `child`,
+            group: guest.group,
+            originalGuestId: guest.id,
+            childSequence: existingChildren + 1,
+            isChild: true,
+            id: generateUniqueGuestId(existingIds)
+        };
+        setGuestList(prevGuestList => addGuestsUnique(prevGuestList, childGuest));
         updateTables(guestList.length + 1);
         setHasUnsavedChanges(true);
     };
@@ -1089,9 +1117,16 @@ const saveArrangement = async () => {
         if (selectedGuests.size > 0) {
             saveStateToHistory(`Deleted ${selectedGuests.size} guest(s) from guest list`);
         }
-        setGuestList(prevGuestList =>
-            prevGuestList.filter(guest => !selectedGuests.has(guest.id))
-        );
+        setGuestList(prevGuestList => {
+            const filtered = prevGuestList.filter(guest => !selectedGuests.has(guest.id));
+            logSeating('After removeSelectedGuests', {
+                removedIds: Array.from(selectedGuests),
+                before: summarizeIds(prevGuestList),
+                after: summarizeIds(filtered),
+                duplicates: findDuplicatesById(filtered)
+            });
+            return filtered;
+        });
         setSelectedGuests(new Set());
         setContextMenu({ visible: false, x: 0, y: 0 }); // Hide context menu
         setHasUnsavedChanges(true);
@@ -1114,25 +1149,24 @@ const saveArrangement = async () => {
 
     const handleManagerRenameGuest = (originalId, newFirst, newLast) => {
         // Rename the primary guest only
-        setGuestList(prev => prev.map(g => g.id === originalId ? { ...g, firstName: newFirst, lastName: newLast } : g));
-        setTables(prev => prev.map(t => t.map(g => g.id === originalId ? { ...g, firstName: newFirst, lastName: newLast } : g)));
+        setGuestList(prev => prev.map(g => String(g.id) === String(originalId) ? { ...g, firstName: newFirst, lastName: newLast } : g));
+        setTables(prev => prev.map(t => t.map(g => String(g.id) === String(originalId) ? { ...g, firstName: newFirst, lastName: newLast } : g)));
         saveStateToHistory(`Renamed guest to ${newFirst} ${newLast}`);
         setHasUnsavedChanges(true);
     };
 
     const handleManagerDeleteGuest = (originalId) => {
-        // Remove primary and all plus ones linked to it from both guestList and tables
         saveStateToHistory(`Deleted guest ${originalId} and their tickets`);
-        setGuestList(prev => prev.filter(g => g.id !== originalId && g.originalGuestId !== originalId));
-        setTables(prev => prev.map(t => t.filter(g => g.id !== originalId && g.originalGuestId !== originalId)));
+        setGuestList(prev => prev.filter(g => String(g.id) !== String(originalId) && String(g.originalGuestId) !== String(originalId)));
+        setTables(prev => prev.map(t => t.filter(g => String(g.id) !== String(originalId) && String(g.originalGuestId) !== String(originalId))));
         setHasUnsavedChanges(true);
     };
 
     const handleManagerAddGuest = ({ firstName, lastName, group }) => {
-        const nextId = getNextGuestId();
-        const newGuest = { id: nextId, firstName, lastName, group: group || 'Ungrouped' };
+        const allGuests = [...guestList, ...tables.flat()];
+        const existingIds = new Set(allGuests.map(g => String(g.id)));
+        const newGuest = { id: generateUniqueGuestId(existingIds), firstName, lastName, group: group || 'Ungrouped' };
         saveStateToHistory(`Added guest ${firstName} ${lastName}`);
-        // Create the group if it doesn't exist yet
         const grp = (group || 'Ungrouped').trim();
         if (grp && !getUniqueGroups().includes(grp)) {
             setCustomGroups(prev => {
@@ -1141,7 +1175,7 @@ const saveArrangement = async () => {
                 return Array.from(set);
             });
         }
-        setGuestList(prev => [...prev, newGuest]);
+        setGuestList(prev => addGuestsUnique(prev, newGuest));
         updateTables(guestList.length + 1);
         setHasUnsavedChanges(true);
     };
@@ -1159,8 +1193,8 @@ const saveArrangement = async () => {
             });
         }
         // Update only the primary guest's group (plus ones keep their group inherited visually)
-        setGuestList(prev => prev.map(g => g.id === originalId ? { ...g, group: trimmed } : g));
-        setTables(prev => prev.map(t => t.map(g => g.id === originalId ? { ...g, group: trimmed } : g)));
+    setGuestList(prev => prev.map(g => String(g.id) === String(originalId) ? { ...g, group: trimmed } : g));
+    setTables(prev => prev.map(t => t.map(g => String(g.id) === String(originalId) ? { ...g, group: trimmed } : g)));
         setHasUnsavedChanges(true);
     };
 
@@ -1405,26 +1439,7 @@ const saveArrangement = async () => {
         setEditingTable(null);
     };
 
-    // Helper functions for adding guests
-    const getNextGuestId = () => {
-        const allGuests = [...guestList, ...tables.flat()];
-        let maxId = 0;
-        
-        allGuests.forEach(guest => {
-            const id = guest.id;
-            if (typeof id === 'string') {
-                const numericPart = id.match(/(\d+)/);
-                if (numericPart) {
-                    const num = parseInt(numericPart[1], 10);
-                    if (num > maxId) maxId = num;
-                }
-            } else if (typeof id === 'number') {
-                if (id > maxId) maxId = id;
-            }
-        });
-        
-        return maxId + 1;
-    };
+    // Removed legacy getNextGuestId; GUID generation used directly.
 
     const openAddGuestsModal = () => {
         setNewGuestsData([
@@ -1469,13 +1484,18 @@ const saveArrangement = async () => {
             return;
         }
 
-        let nextId = getNextGuestId();
-        const guestsToAdd = validGuests.map(guest => ({
-            firstName: guest.firstName.trim(),
-            lastName: guest.lastName.trim(),
-            group: guest.group.trim() || 'Ungrouped',
-            id: nextId++
-        }));
+        const allGuests = [...guestList, ...tables.flat()];
+        const existingIds = new Set(allGuests.map(g => String(g.id)));
+        const guestsToAdd = validGuests.map(guest => {
+            const id = generateUniqueGuestId(existingIds);
+            existingIds.add(id);
+            return {
+                firstName: guest.firstName.trim(),
+                lastName: guest.lastName.trim(),
+                group: guest.group.trim() || 'Ungrouped',
+                id
+            };
+        });
 
     saveStateToHistory(`Added ${guestsToAdd.length} guest(s)`);
     setGuestList(prevGuestList => [...prevGuestList, ...guestsToAdd]);
@@ -1504,17 +1524,15 @@ const saveArrangement = async () => {
             for(var group of sortedGroups) {
                 groupedGuests[group].sort((a, b) => {
                     const getGuestOrder = (guest) => {
-                    if (guest.originalGuestId) {
-                        const parts = guest.id.split('-');
-                        const sequenceNum = parseInt(parts[parts.length - 1], 10) || 0;
-                        return `${guest.originalGuestId}-${sequenceNum.toString().padStart(3, '0')}`;
-                    } else {
-                        return `${guest.id}-000`;
-                    }
-                };
-        
-                return getGuestOrder(a).localeCompare(getGuestOrder(b));
-            });
+                        if (guest.originalGuestId) {
+                            const seq = guest.plusOneSequence || guest.childSequence || 0;
+                            return `${guest.originalGuestId}-${seq.toString().padStart(3, '0')}`;
+                        } else {
+                            return `${guest.id}-000`;
+                        }
+                    };
+                    return getGuestOrder(a).localeCompare(getGuestOrder(b));
+                });
             }
             return sortedGroups.map(groupName => (
                 <div key={groupName} style={{ marginBottom: '20px' }}>
@@ -1700,13 +1718,12 @@ const saveArrangement = async () => {
                 .sort((a, b) => {
                     const getGuestOrder = (guest) => {
                         if (guest.originalGuestId) {
-                            const parts = guest.id.split('-');
-                            const sequenceNum = parseInt(parts[parts.length - 1], 10) || 0;
-                            return `${guest.originalGuestId}-${sequenceNum.toString().padStart(3, '0')}`;
+                            const seq = guest.plusOneSequence || guest.childSequence || 0;
+                            return `${guest.originalGuestId}-${seq.toString().padStart(3, '0')}`;
                         } else {
                             return `${guest.id}-000`;
                         }
-                    }
+                    };
                     return getGuestOrder(a).localeCompare(getGuestOrder(b));
                 })
                 //.filter(guest => !guest.originalGuestId) // Exclude "+1" guests from main list
