@@ -3,6 +3,7 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import Icon from '@mui/material/Icon';
 import CloseIcon from '@mui/icons-material/Close';
+import NightlifeIcon from '@mui/icons-material/Nightlife';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 
 const TableList = ({
@@ -163,8 +164,11 @@ const TableList = ({
                                     className='table-guest-item'
                                 >
                                     <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-                                        <span style={{ flex: 1 }}>
+                                        <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
                                             {highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}
+                                            {guest.isTableCaptain && (
+                                                <NightlifeIcon titleAccess="Table Captain" fontSize="small" color="secondary" />
+                                            )}
                                         </span>
                                     </div>
                                     <div style={{ marginLeft: '10px', display: 'flex', gap: '5px' }}>
@@ -380,7 +384,12 @@ const TableList = ({
                                         left: `${x}px`,
                                     }}
                                 >
-                                    <span>{highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                        {highlightSearchTerm(`${guest.firstName} ${guest.lastName}`)}
+                                        {guest.isTableCaptain && (
+                                            <NightlifeIcon titleAccess="Table Captain" fontSize="small" color="secondary" />
+                                        )}
+                                    </span>
                                 </div>
                             );
                         }) : (

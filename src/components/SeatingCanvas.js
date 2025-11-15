@@ -48,6 +48,8 @@ function SeatingCanvas({ guests = [] }) {
     const [editingGuest, setEditingGuest] = useState(null);
     const [editFirstName, setEditFirstName] = useState('');
     const [editLastName, setEditLastName] = useState('');
+    const [editIsTableCaptain, setEditIsTableCaptain] = useState(false);
+    const [editingGuestTableIndex, setEditingGuestTableIndex] = useState(null);
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
     const [isDragOverGuestList, setIsDragOverGuestList] = useState(false);
     const [showNewGroupModal, setShowNewGroupModal] = useState(false);
@@ -504,7 +506,7 @@ const saveArrangement = async () => {
         let currentY = 30;
         const pageHeight = 280;
         const rowHeight = 8;
-        const tableHeaderHeight = 12;
+        const tableHeaderBaseHeight = 12;
         const marginBetweenTables = 15;
 
         tables.forEach((table, tableIndex) => {
@@ -513,9 +515,11 @@ const saveArrangement = async () => {
             const tableDisplayName = getTableDisplayName(tableIndex);
             const tableDisplayNumber = getTableDisplayNumber(tableIndex);
             const tableTitle = `${tableDisplayName} (Table #${tableDisplayNumber})`;
+            const captain = Array.isArray(table) ? table.find(g => g.isTableCaptain) : null;
+            const headerExtra = captain ? 6 : 0; // extra space for captain line
             
             // Check if we need a new page for this table
-            const estimatedTableHeight = tableHeaderHeight + (table.length * rowHeight) + marginBetweenTables;
+            const estimatedTableHeight = (tableHeaderBaseHeight + headerExtra) + (table.length * rowHeight) + marginBetweenTables;
             if (currentY + estimatedTableHeight > pageHeight) {
                 doc.addPage();
                 currentY = 20;
@@ -527,8 +531,13 @@ const saveArrangement = async () => {
             doc.text(tableTitle, 10, currentY);
             doc.setFontSize(10);
             doc.text(`Guests: ${table.length}/${getTableDisplaySize(tableIndex)}`, 10, currentY + 8);
+            if (captain) {
+                const label = `${t('table')} ${t('captain') || 'Captain'}`;
+                const capName = `${captain.firstName || ''} ${captain.lastName || ''}`.trim();
+                doc.text(`${label}: ${capName}`, 10, currentY + 14);
+            }
             
-            currentY += tableHeaderHeight + 5;
+            currentY += (tableHeaderBaseHeight + headerExtra) + 5;
 
             const adults = table.filter(g => !g.isChild);
             const children = table.filter(g => g.isChild);
@@ -875,14 +884,9 @@ const saveArrangement = async () => {
         });
 
         setGuestList(prevGuestList => {
-            let updatedGuestList = [...prevGuestList];
-            guestsToMove.forEach(guestToMove => {
-                const guestFromTableIndex = parseInt(guestToMove.fromTableIndex, 10);
-                if (isNaN(guestFromTableIndex)) {
-                    // Normalize id comparison to avoid string/number mismatch preventing removal
-                    updatedGuestList = updatedGuestList.filter(unassigned => String(unassigned.id) !== String(guestToMove.id));
-                }
-            });
+            // Always remove moved guests from the unseated list by id
+            const movedIds = new Set(guestsToMove.map(g => String(g.id)));
+            const updatedGuestList = prevGuestList.filter(unassigned => !movedIds.has(String(unassigned.id)));
             const dups = findDuplicatesById(updatedGuestList);
             if (dups.length) {
                 logSeating('After handleDrop - duplicates detected (pre-dedupe)', {
@@ -942,7 +946,7 @@ const saveArrangement = async () => {
                 console.log(prevGuestList);
                 const cleaned = guestsToMove.map(g => {
                     const { fromTableIndex, ...cleanGuest } = g;
-                    return cleanGuest;
+                    return { ...cleanGuest, isTableCaptain: false };
                 });
                 return addGuestsUnique(prevGuestList, cleaned);
             });
@@ -964,7 +968,7 @@ const saveArrangement = async () => {
         });
 
             setGuestList(prevGuestList => {
-                const merged = addGuestsUnique(prevGuestList, guest);
+                const merged = addGuestsUnique(prevGuestList, { ...guest, isTableCaptain: false });
                 const { guestList: normalized } = normalizeGuestData(merged, tables);
                 return normalized;
             });
@@ -991,7 +995,8 @@ const saveArrangement = async () => {
         
         // Then add all guests back to guest list
         setGuestList(prevGuestList => {
-            const merged = addGuestsUnique(prevGuestList, guestsToMove);
+            const reset = guestsToMove.map(g => ({ ...g, isTableCaptain: false }));
+            const merged = addGuestsUnique(prevGuestList, reset);
             const { guestList: normalized } = normalizeGuestData(merged, tables);
             return normalized;
         });
@@ -1357,6 +1362,20 @@ const saveArrangement = async () => {
         setEditingGuest(guestId);
         setEditFirstName(currentFirstName.replace(' +1', ''));
         setEditLastName(currentLastName);
+        // Determine if guest is currently seated and their captain status
+        let tableIdx = null;
+        let isCaptain = false;
+        tables.forEach((table, idx) => {
+            if (Array.isArray(table)) {
+                const found = table.find(g => String(g.id) === String(guestId));
+                if (found) {
+                    tableIdx = idx;
+                    isCaptain = !!found.isTableCaptain;
+                }
+            }
+        });
+        setEditingGuestTableIndex(tableIdx);
+        setEditIsTableCaptain(isCaptain);
         setEditModalOpen(true);
     };
 
@@ -1373,20 +1392,32 @@ const saveArrangement = async () => {
         setGuestList(prevGuestList =>
             prevGuestList.map(guest =>
                 guest.id === editingGuest
-                    ? { ...guest, firstName: editFirstName.trim(), lastName: editLastName.trim() }
+                    ? { ...guest, firstName: editFirstName.trim(), lastName: editLastName.trim(), isTableCaptain: editIsTableCaptain && editingGuestTableIndex !== null ? true : false }
                     : guest
             )
         );
 
-        setTables(prevTables =>
-            prevTables.map(table =>
-                table.map(guest =>
-                    guest.id === editingGuest
-                        ? { ...guest, firstName: editFirstName.trim(), lastName: editLastName.trim() }
-                        : guest
-                )
-            )
-        );
+        setTables(prevTables => {
+            return prevTables.map((table, idx) => {
+                if (!Array.isArray(table)) return table;
+                if (idx !== editingGuestTableIndex) {
+                    // If setting captain on another table, ensure others unaffected
+                    return table.map(g =>
+                        g.id === editingGuest
+                            ? { ...g, firstName: editFirstName.trim(), lastName: editLastName.trim() }
+                            : g
+                    );
+                }
+                // Enforce single captain per table when applicable
+                return table.map(g => {
+                    if (String(g.id) === String(editingGuest)) {
+                        return { ...g, firstName: editFirstName.trim(), lastName: editLastName.trim(), isTableCaptain: !!editIsTableCaptain };
+                    }
+                    // If our target is captain, clear others; otherwise leave as-is
+                    return editIsTableCaptain ? { ...g, isTableCaptain: false } : g;
+                });
+            });
+        });
 
         closeEditModal();
     };
@@ -2102,6 +2133,16 @@ const saveArrangement = async () => {
                         margin="normal"
                         variant="outlined"
                     />
+                    {editingGuestTableIndex !== null && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: '8px' }}>
+                            <input
+                                type="checkbox"
+                                checked={!!editIsTableCaptain}
+                                onChange={(e) => setEditIsTableCaptain(e.target.checked)}
+                            />
+                            <span>{t('table')} {t('captain') || 'Capitán de mesa'}</span>
+                        </label>
+                    )}
                     <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                         <Button
                             variant="outlined"
@@ -2120,14 +2161,12 @@ const saveArrangement = async () => {
                 </Box>
             </Modal>
 
-            {/* Notifications handled globally by NotificationProvider */}
             <div className="guestList"
                 onDragOver={(e) => {
                     e.preventDefault();
                     setIsDragOverGuestList(true);
                 }}
                 onDragLeave={(e) => {
-                    // Only hide if we're leaving the guest list container entirely
                     if (!e.currentTarget.contains(e.relatedTarget)) {
                         setIsDragOverGuestList(false);
                     }
