@@ -11,6 +11,7 @@ import PersonRemoveIcon from '@mui/icons-material/PersonRemove';
 import ListAltIcon from '@mui/icons-material/ListAlt';
 import TableBarIcon from '@mui/icons-material/TableBar';
 import Modal from '@mui/material/Modal';
+import Select from '@mui/material/Select';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -49,6 +50,84 @@ function SeatingCanvas({ guests = [] }) {
     const [editFirstName, setEditFirstName] = useState('');
     const [editLastName, setEditLastName] = useState('');
     const [editIsTableCaptain, setEditIsTableCaptain] = useState(false);
+    const [tableContextMenu, setTableContextMenu] = useState({ visible: false, x: 0, y: 0, tableIndex: null });
+    const [swapModalOpen, setSwapModalOpen] = useState(false);
+    const [swapSourceIndex, setSwapSourceIndex] = useState(null);
+    const [swapTargetIndex, setSwapTargetIndex] = useState('');
+        // Remove an entire table: return seated guests to unseated list and delete table
+        const handleRemoveTable = (tableIndex) => {
+            if (tableIndex == null || tableIndex < 0 || tableIndex >= tables.length) return;
+            const tableGuests = Array.isArray(tables[tableIndex]) ? tables[tableIndex] : [];
+            const tableName = getTableDisplayName(tableIndex);
+            const tableNo = getTableDisplayNumber(tableIndex);
+            saveStateToHistory(`Removed table ${tableName} (#${tableNo}) and returned ${tableGuests.length} guest(s)`);
+
+            // Move guests back to guest list, clearing captain flag
+            const resetGuests = tableGuests.map(g => ({ ...g, isTableCaptain: false }));
+            setGuestList(prev => addGuestsUnique(prev, resetGuests));
+
+            // Remove the table
+            setTables(prev => prev.filter((_, idx) => idx !== tableIndex));
+
+            // Shift table aliases/sizes/numbers to fill the gap
+            setTableAliases(prev => {
+                const next = {};
+                Object.keys(prev || {}).forEach(k => {
+                    const i = parseInt(k, 10);
+                    if (Number.isNaN(i)) return;
+                    if (i < tableIndex) next[i] = prev[i];
+                    else if (i > tableIndex) next[i - 1] = prev[i];
+                });
+                return next;
+            });
+            setTableSizes(prev => {
+                const next = {};
+                Object.keys(prev || {}).forEach(k => {
+                    const i = parseInt(k, 10);
+                    if (Number.isNaN(i)) return;
+                    if (i < tableIndex) next[i] = prev[i];
+                    else if (i > tableIndex) next[i - 1] = prev[i];
+                });
+                return next;
+            });
+            setTableNumbers(prev => {
+                const next = {};
+                Object.keys(prev || {}).forEach(k => {
+                    const i = parseInt(k, 10);
+                    if (Number.isNaN(i)) return;
+                    if (i < tableIndex) next[i] = prev[i];
+                    else if (i > tableIndex) next[i - 1] = prev[i];
+                });
+                return next;
+            });
+
+            // Adjust editing table index if necessary
+            setEditingTable(prev => {
+                if (prev == null) return prev;
+                if (prev === tableIndex) return null;
+                if (prev > tableIndex) return prev - 1;
+                return prev;
+            });
+
+            setHasUnsavedChanges(true);
+            setTableContextMenu({ visible: false, x: 0, y: 0, tableIndex: null });
+        };
+
+        // Open table context menu
+        const handleTableContextMenu = (e, tableIndex) => {
+            e.preventDefault();
+            setTableContextMenu({ visible: true, x: e.clientX, y: e.clientY, tableIndex });
+        };
+        const openSwapModalFromContext = () => {
+            const src = tableContextMenu.tableIndex;
+            if (src == null) return;
+            setSwapSourceIndex(src);
+            // pick first other index as default
+            const first = tables.findIndex((_, idx) => idx !== src);
+            setSwapTargetIndex(first >= 0 ? first : '');
+            setSwapModalOpen(true);
+            setTableContextMenu({ visible: false, x: 0, y: 0, tableIndex: null });
+        };
     const [editingGuestTableIndex, setEditingGuestTableIndex] = useState(null);
     const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
     const [isDragOverGuestList, setIsDragOverGuestList] = useState(false);
@@ -1002,6 +1081,54 @@ const saveArrangement = async () => {
         });
     };
 
+    // Helper to swap two keys in mapping objects like aliases/sizes/numbers
+    const swapMappingEntries = (mapping, a, b) => {
+        if (!mapping) return mapping;
+        const next = { ...mapping };
+        const hasA = Object.prototype.hasOwnProperty.call(next, a);
+        const hasB = Object.prototype.hasOwnProperty.call(next, b);
+        const valA = next[a];
+        const valB = next[b];
+        if (hasA) next[b] = valA; else delete next[b];
+        if (hasB) next[a] = valB; else delete next[a];
+        return next;
+    };
+
+    // Swap two entire tables, including guests and table metadata
+    const handleSwapTables = (indexA, indexB) => {
+        if (indexA == null || indexB == null) return;
+        if (indexA === indexB) return;
+        if (indexA < 0 || indexB < 0 || indexA >= tables.length || indexB >= tables.length) return;
+
+        const nameA = getTableDisplayName(indexA);
+        const nameB = getTableDisplayName(indexB);
+        const numA = getTableDisplayNumber(indexA);
+        const numB = getTableDisplayNumber(indexB);
+        saveStateToHistory(`Swapped tables ${nameA} (#${numA}) and ${nameB} (#${numB})`);
+
+        setTables(prev => {
+            const next = [...prev];
+            const tmp = next[indexA];
+            next[indexA] = next[indexB];
+            next[indexB] = tmp;
+            return next;
+        });
+        setTableAliases(prev => swapMappingEntries(prev, indexA, indexB));
+        setTableSizes(prev => swapMappingEntries(prev, indexA, indexB));
+        setTableNumbers(prev => swapMappingEntries(prev, indexA, indexB));
+
+        setEditingTable(prev => {
+            if (prev == null) return prev;
+            if (prev === indexA) return indexB;
+            if (prev === indexB) return indexA;
+            return prev;
+        });
+
+        setHasUnsavedChanges(true);
+        setTableContextMenu({ visible: false, x: 0, y: 0, tableIndex: null });
+        try { notify.success('Tables swapped'); } catch (_) {}
+    };
+
     // Add a new empty table
     const handleAddTable = () => {
         const defaultTableSize = getTableSize();
@@ -1923,6 +2050,43 @@ const saveArrangement = async () => {
                         existingGuests={guestList}
                         existingTables={tables}
                     />            {/* Context Menu */}
+            {/* Table Context Menu */}
+            {tableContextMenu.visible && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: tableContextMenu.y,
+                        left: tableContextMenu.x,
+                        background: 'white',
+                        border: '1px solid #ccc',
+                        borderRadius: 6,
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        zIndex: 2000,
+                        minWidth: 160,
+                        padding: 4
+                    }}
+                    onMouseLeave={() => setTableContextMenu({ visible: false, x: 0, y: 0, tableIndex: null })}
+                >
+                    <button
+                        style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            background: 'transparent', border: 'none', padding: '8px 12px', cursor: 'pointer'
+                        }}
+                        onClick={() => handleRemoveTable(tableContextMenu.tableIndex)}
+                    >
+                        {t('removeTable')}
+                    </button>
+                    <button
+                        style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            background: 'transparent', border: 'none', padding: '8px 12px', cursor: 'pointer'
+                        }}
+                        onClick={openSwapModalFromContext}
+                    >
+                        {t('swapTableWith') || 'Swap table with...'}
+                    </button>
+                </div>
+            )}
             <ContextMenu
                 visible={contextMenu.visible}
                 x={contextMenu.x}
@@ -1975,6 +2139,15 @@ const saveArrangement = async () => {
                             Create Group
                         </Button>
                     </Box>
+                        <button
+                            style={{
+                                display: 'block', width: '100%', textAlign: 'left',
+                                background: 'transparent', border: 'none', padding: '8px 12px', cursor: 'pointer'
+                            }}
+                            onClick={openSwapModalFromContext}
+                        >
+                            {t('swapTableWith') || 'Swap table with...'}
+                        </button>
                 </Box>
             </Modal>
 
@@ -2106,6 +2279,57 @@ const saveArrangement = async () => {
                 groups={getUniqueGroups()}
             />
 
+            {/* Swap Tables Modal */}
+            <Modal
+                open={swapModalOpen}
+                onClose={() => setSwapModalOpen(false)}
+                aria-labelledby="swap-tables-modal-title"
+                aria-describedby="swap-tables-modal-description"
+            >
+                <Box sx={modalStyle}>
+                    <Typography id="swap-tables-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
+                        {t('swapTableWith') || 'Swap table with...'}
+                    </Typography>
+                    <Typography variant="body2" sx={{ mb: 1 }}>
+                        {t('selectTable') || 'Select table'}
+                    </Typography>
+                    <Select
+                        fullWidth
+                        size="small"
+                        value={swapTargetIndex}
+                        onChange={(e) => setSwapTargetIndex(e.target.value)}
+                    >
+                        {tables.map((_, idx) => (
+                            idx !== swapSourceIndex ? (
+                                <MenuItem key={idx} value={idx}>
+                                    {`${t('table')} ${getTableDisplayNumber(idx)} — ${getTableDisplayName(idx)}`}
+                                </MenuItem>
+                            ) : null
+                        ))}
+                    </Select>
+                    <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                        <Button
+                            variant="outlined"
+                            onClick={() => setSwapModalOpen(false)}
+                        >
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={() => {
+                                if (swapSourceIndex != null && swapTargetIndex !== '' && swapTargetIndex != null) {
+                                    handleSwapTables(swapSourceIndex, Number(swapTargetIndex));
+                                    setSwapModalOpen(false);
+                                }
+                            }}
+                            disabled={swapSourceIndex == null || swapTargetIndex === '' || swapTargetIndex == null}
+                        >
+                            {t('swap') || 'Swap'}
+                        </Button>
+                    </Box>
+                </Box>
+            </Modal>
+
             {/* Edit Guest Modal */}
             <Modal
                 open={editModalOpen}
@@ -2140,7 +2364,7 @@ const saveArrangement = async () => {
                                 checked={!!editIsTableCaptain}
                                 onChange={(e) => setEditIsTableCaptain(e.target.checked)}
                             />
-                            <span>{t('table')} {t('captain') || 'Capitán de mesa'}</span>
+                            <span>{`${t('table')} ${t('captain') || 'Captain'}`}</span>
                         </label>
                     )}
                     <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
@@ -2414,6 +2638,7 @@ const saveArrangement = async () => {
                 onAddTable={handleAddTable}
                 onEditGuest={openEditModal}
                 onRemoveGuest={handleRemove}
+                onTableContextMenu={handleTableContextMenu}
                 currentLanguage={currentLanguage}
             />
             </div>

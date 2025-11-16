@@ -24,6 +24,7 @@ const TableList = ({
     onTableSizeChange,
     onEditGuest,
     onAddTable,
+    onTableContextMenu,
     highlightSearchTerm,
     getTableDisplayName,
     getTableDisplaySize,
@@ -44,6 +45,11 @@ const TableList = ({
                 {tables.map((table, tableIndex) => (
                     <div
                         key={tableIndex}
+                        onContextMenu={(e) => {
+                            if (typeof onTableContextMenu === 'function') {
+                                onTableContextMenu(e, tableIndex);
+                            }
+                        }}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                             const guest = JSON.parse(e.dataTransfer.getData('guest'));
@@ -239,6 +245,11 @@ const TableList = ({
                 {tables.map((table, tableIndex) => (
                     <div
                         key={tableIndex}
+                        onContextMenu={(e) => {
+                            if (typeof onTableContextMenu === 'function') {
+                                onTableContextMenu(e, tableIndex);
+                            }
+                        }}
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={(e) => {
                             const guest = JSON.parse(e.dataTransfer.getData('guest'));

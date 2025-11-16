@@ -112,6 +112,9 @@ export const spanishTranslations = {
     'downloadSampleCSV': 'Descargar CSV de Muestra',
     'guestManager': 'Gestor de Invitados',
     'groupByGroup': 'Agrupar por grupo',
+    'swapTableWith': 'Intercambiar mesa con...',
+    'selectTable': 'Selecciona mesa',
+    'swap': 'Intercambiar',
     
     // CSV Import
     'csvImport': 'Importar CSV',
@@ -235,6 +238,7 @@ export const spanishTranslations = {
     'usingLocalData': 'No se pudo conectar al servidor. Usando datos locales.',
     'failedDeleteWedding': 'No se pudo eliminar la boda. Inténtalo de nuevo.',
     'failedSaveWedding': 'No se pudo guardar la boda. Inténtalo de nuevo.',
+    'table_capatain': 'Capitán de mesa',
 };
 
 export default spanishTranslations;

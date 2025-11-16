@@ -112,6 +112,9 @@ export const englishTranslations = {
     'downloadSampleCSV': 'Download Sample CSV',
     'guestManager': 'Guest Manager',
     'groupByGroup': 'Group by group',
+    'swapTableWith': 'Swap table with...',
+    'selectTable': 'Select table',
+    'swap': 'Swap',
     
     // CSV Import
     'csvImport': 'CSV Import',
@@ -235,6 +238,7 @@ export const englishTranslations = {
     'usingLocalData': 'Could not connect to server. Using local data.',
     'failedDeleteWedding': 'Failed to delete wedding. Please try again.',
     'failedSaveWedding': 'Failed to save wedding. Please try again.',
+    'table_capatain': 'Table captain',
 };
 
 export default englishTranslations;
