@@ -76,7 +76,7 @@ const TableList = ({
                                             size="small"
                                             defaultValue={getTableDisplayName(tableIndex)}
                                             style={{ flex: 1, backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     onTableAliasChange(tableIndex, e.target.value);
                                                     onTableEditComplete();
@@ -90,7 +90,7 @@ const TableList = ({
                                             size="small"
                                             defaultValue={getTableDisplayNumber(tableIndex)}
                                             style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     onTableNumberChange(tableIndex, e.target.value);
                                                     onTableEditComplete();
@@ -106,7 +106,7 @@ const TableList = ({
                                             size="small"
                                             defaultValue={getTableDisplaySize(tableIndex)}
                                             style={{ width: '100px', backgroundColor: 'white', borderRadius: '4px' }}
-                                            onKeyPress={(e) => {
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     onTableSizeChange(tableIndex, e.target.value);
                                                     onTableEditComplete();
@@ -274,7 +274,7 @@ const TableList = ({
                                             type="text"
                                             defaultValue={getTableDisplayName(tableIndex)}
                                             placeholder="Table name..."
-                                            onKeyPress={(e) => {
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     onTableAliasChange(tableIndex, e.target.value);
                                                     onTableEditComplete();
@@ -294,7 +294,7 @@ const TableList = ({
                                             type="number"
                                             min="1"
                                             defaultValue={getTableDisplayNumber(tableIndex)}
-                                            onKeyPress={(e) => {
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     onTableNumberChange(tableIndex, e.target.value);
                                                     onTableEditComplete();
@@ -316,7 +316,7 @@ const TableList = ({
                                             type="number"
                                             min="1"
                                             defaultValue={getTableDisplaySize(tableIndex)}
-                                            onKeyPress={(e) => {
+                                            onKeyDown={(e) => {
                                                 if (e.key === 'Enter') {
                                                     onTableSizeChange(tableIndex, e.target.value);
                                                     onTableEditComplete();

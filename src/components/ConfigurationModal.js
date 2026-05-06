@@ -11,6 +11,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CSVImporter from './CSVImporter';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
+import { S3_API_BASE } from '../config/api';
 
 const ConfigurationModal = ({ 
     onExportToJSON, 
@@ -26,7 +27,6 @@ const ConfigurationModal = ({
     const [open, setOpen] = useState(false);
     const [defaultTableSize, setDefaultTableSize] = useState(10);
     const [language, setLanguage] = useState('english'); // 'english' or 'spanish'
-    const S3_API_BASE = "https://q5c7u5zmzc4l7r4warc6oslx4e0bgoqd.lambda-url.us-east-2.on.aws/api/s3";
     
     // Use translation hook
     const { t } = useSeatingTranslation(currentLanguage);
@@ -55,7 +55,6 @@ const ConfigurationModal = ({
             language: language
         };
         localStorage.setItem('seatingConfiguration', JSON.stringify(config));
-        console.log('Saving configuration:', config);
         
         // Notify parent component of language change
         if (onLanguageChange) {

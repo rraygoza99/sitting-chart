@@ -234,7 +234,7 @@ function SeatingCanvas({ guests = [] }) {
     useEffect(() => {
         if (blocker.state === 'blocked') {
             const confirmLeave = window.confirm(
-                t ? t('unsavedChangesConfirm') || 'You have unsaved changes. Leave this page?' : 'You have unsaved changes. Leave this page?'
+                t ? t('unsavedChangesMessage') || 'You have unsaved changes. Leave this page?' : 'You have unsaved changes. Leave this page?'
             );
             if (confirmLeave) {
                 blocker.proceed();
@@ -937,7 +937,6 @@ const saveArrangement = async () => {
         
         const isMultiDrag = guest.isMultiDrag;
         const guestsToMove = isMultiDrag ? guest.selectedGuests : [guest];
-        console.log('Guests to move:', guestsToMove);
         // Save state before making changes
         if (isMultiDrag) {
             saveStateToHistory(`Moved ${guestsToMove.length} guests to table ${tableIndex + 1}`);
@@ -1022,7 +1021,6 @@ const saveArrangement = async () => {
             });
 
             setGuestList(prevGuestList => {
-                console.log(prevGuestList);
                 const cleaned = guestsToMove.map(g => {
                     const { fromTableIndex, ...cleanGuest } = g;
                     return { ...cleanGuest, isTableCaptain: false };
@@ -1613,7 +1611,6 @@ const saveArrangement = async () => {
 
     const handleLanguageChange = (newLanguage) => {
         setCurrentLanguage(newLanguage);
-        console.log('Language changed to:', newLanguage);
         // Here you can add additional logic when language changes
         // such as updating text labels, date formats, etc.
     };
@@ -1679,7 +1676,7 @@ const saveArrangement = async () => {
             }, {});
 
             const sortedGroups = Object.keys(groupedGuests).sort();
-            for(var group of sortedGroups) {
+            for(const group of sortedGroups) {
                 groupedGuests[group].sort((a, b) => {
                     const getGuestOrder = (guest) => {
                         if (guest.originalGuestId) {
@@ -2108,17 +2105,17 @@ const saveArrangement = async () => {
             >
                 <Box sx={modalStyle}>
                     <Typography id="new-group-modal-title" variant="h6" component="h2" sx={{ mb: 2 }}>
-                        Create New Group
+                        {t('createNewGroup')}
                     </Typography>
                     <TextField
                         fullWidth
-                        label="Group Name"
+                        label={t('groupName')}
                         value={newGroupName}
                         onChange={(e) => setNewGroupName(e.target.value)}
                         margin="normal"
                         variant="outlined"
-                        placeholder="Enter group name..."
-                        onKeyPress={(e) => {
+                        placeholder={t('newGroupName')}
+                        onKeyDown={(e) => {
                             if (e.key === 'Enter' && newGroupName.trim()) {
                                 saveNewGroup();
                             }
@@ -2129,25 +2126,16 @@ const saveArrangement = async () => {
                             variant="outlined"
                             onClick={closeNewGroupModal}
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                         <Button
                             variant="contained"
                             onClick={saveNewGroup}
                             disabled={!newGroupName.trim()}
                         >
-                            Create Group
+                            {t('createNewGroup')}
                         </Button>
                     </Box>
-                        <button
-                            style={{
-                                display: 'block', width: '100%', textAlign: 'left',
-                                background: 'transparent', border: 'none', padding: '8px 12px', cursor: 'pointer'
-                            }}
-                            onClick={openSwapModalFromContext}
-                        >
-                            {t('swapTableWith') || 'Swap table with...'}
-                        </button>
                 </Box>
             </Modal>
 

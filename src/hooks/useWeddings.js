@@ -1,30 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { listWeddings, createWedding, deleteWedding } from "../utils/weddingsService";
+import { listWeddings, createWeddingWithDetails, deleteWedding } from "../utils/weddingsService";
 import { slugify } from "../utils/slug";
 
 // LocalStorage keys used for backup/fallback
 const LS_WEDDING_ITEMS = "weddingItems";
 const arrangementKey = (name) => `weddingArrangement-${name}`;
-
-function buildEmptyWeddingData(name, ownerMail) {
-  return {
-    weddingName: name,
-    exportDate: new Date().toISOString(),
-    totalGuests: 0,
-    totalTables: 0,
-    guestList: [],
-    tables: [],
-    tableAliases: {},
-    tableSizes: {},
-    tableNumbers: {},
-    metadata: {
-      viewMode: "list",
-      isGrouped: true,
-      version: "1.0",
-      ...(ownerMail ? { "x-amz-meta-owner": ownerMail } : {}),
-    },
-  };
-}
 
 export function useWeddings({ ownerMail } = {}) {
   const [items, setItems] = useState([]);
@@ -72,30 +52,26 @@ export function useWeddings({ ownerMail } = {}) {
 
   const toSlug = useCallback((displayName) => slugify(displayName), []);
 
-  const validateName = useCallback((displayName) => {
-    const trimmed = (displayName || "").trim();
-    if (!trimmed) throw new Error("Please enter a wedding name");
-    const slug = toSlug(trimmed);
-    if (!slug) throw new Error("Please enter a valid wedding name");
-    if (items.includes(slug)) throw new Error("Wedding name already exists!");
-    return { trimmed, slug };
-  }, [items, toSlug]);
-
   const addWedding = useCallback(
-    async (displayName) => {
-      const { trimmed, slug } = validateName(displayName);
+    async ({ partner1Name, partner2Name, weddingDate, venue }) => {
+      // Client-side duplicate guard: predict the slug the server will produce
+      const dateStr = String(weddingDate).slice(0, 10);
+      const expectedSlug = `${toSlug(partner1Name)}-${toSlug(partner2Name)}-${dateStr}`;
+      if (items.includes(expectedSlug)) {
+        throw new Error("Wedding name already exists!");
+      }
       setSaving(true);
       try {
-        const data = { ...buildEmptyWeddingData(slug, ownerMail), displayName: trimmed, slug };
-        await createWedding(slug, data, ownerMail);
+        const slug = await createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue });
         const next = [...items, slug];
         setItems(next);
         writeBackup(next);
+        return slug;
       } finally {
         setSaving(false);
       }
     },
-    [items, ownerMail, validateName, writeBackup]
+    [items, toSlug, writeBackup]
   );
 
   const removeWedding = useCallback(

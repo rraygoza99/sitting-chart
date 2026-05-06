@@ -5,7 +5,6 @@ import { Navigate } from "react-router-dom";
 const ProtectedRoute = ({ children }) => {
   const auth = useAuth();
 
-  console.log(auth);
   if (auth.isLoading) {
     return <div>Checking authentication...</div>;
   }

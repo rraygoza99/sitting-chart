@@ -67,12 +67,13 @@ function EditableList() {
             )}
             {/* Create wedding */}
             <CreateWeddingForm
-                onCreate={async (name) => {
+                onCreate={async ({ partner1Name, partner2Name, weddingDate, venue }) => {
                     try {
-                        await addWedding(name);
-                        notify.success(t('createdWedding', { name }));
+                        const slug = await addWedding({ partner1Name, partner2Name, weddingDate, venue });
+                        notify.success(t('createdWedding', { name: `${partner1Name} & ${partner2Name}` }));
+                        return slug;
                     } catch (err) {
-                        notify.error(t('failedSaveWedding'));
+                        notify.error(err?.message || t('failedSaveWedding'));
                         throw err; // preserve form's submitting state logic
                     }
                 }}

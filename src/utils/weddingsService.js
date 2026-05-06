@@ -1,4 +1,5 @@
-import { S3_API_BASE } from "../config/api";
+import { S3_API_BASE, WEDDINGS_API_BASE } from "../config/api";
+import { slugify } from "./slug";
 
 // List weddings from the server, optionally filtered by ownerMail if backend supports it.
 // Returns an array of wedding names (strings) without the .json extension.
@@ -85,4 +86,36 @@ export async function getWedding(weddingName) {
 // Save a wedding JSON (alias to create/upload)
 export async function saveWedding(weddingName, weddingData, ownerMail) {
   return createWedding(weddingName, weddingData, ownerMail);
+}
+
+/**
+ * Create a new wedding via the dedicated REST endpoint (POST /api/weddings).
+ * @param {{ partner1Name: string, partner2Name: string, weddingDate: string, venue?: string }} details
+ * @returns {Promise<string>} The slug/ID of the created wedding (safeName without .json)
+ */
+export async function createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }) {
+  if (!WEDDINGS_API_BASE) {
+    throw new Error("Weddings API base URL is not configured (REACT_APP_WEDDINGS_API_BASE).");
+  }
+  const response = await fetch(`${WEDDINGS_API_BASE}/api/weddings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      Partner1Name: partner1Name,
+      Partner2Name: partner2Name,
+      WeddingDate: weddingDate,
+      Venue: venue || "",
+    }),
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(text || `HTTP error! status: ${response.status}`);
+  }
+  const data = await response.json().catch(() => null);
+  // Extract slug from response: prefer safeName, then strip .json from fileName
+  if (data?.safeName) return data.safeName;
+  if (data?.fileName) return data.fileName.replace(/\.json$/i, "");
+  // Fallback: construct the safeName locally, matching the server's Sanitize logic
+  const dateStr = String(weddingDate).slice(0, 10);
+  return `${slugify(partner1Name)}-${slugify(partner2Name)}-${dateStr}`;
 }
