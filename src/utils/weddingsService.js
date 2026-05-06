@@ -56,16 +56,9 @@ export async function createWedding(weddingName, weddingData, ownerMail) {
 
 // Delete a wedding on the server
 export async function deleteWedding(weddingName, ownerMail) {
-  const payload = { fileName: `${weddingName}.json` };
-  if (ownerMail) {
-    payload.owner = ownerMail;
-    payload["x-amz-meta-owner"] = ownerMail;
-  }
-
-  const response = await fetch(`${S3_API_BASE}/delete`, {
+  const fileName = encodeURIComponent(`${weddingName}.json`);
+  const response = await fetch(`${S3_API_BASE}/delete/${fileName}`, {
     method: "DELETE",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
