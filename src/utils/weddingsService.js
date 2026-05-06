@@ -93,10 +93,29 @@ export async function saveWedding(weddingName, weddingData, ownerMail) {
  * @param {{ partner1Name: string, partner2Name: string, weddingDate: string, venue?: string }} details
  * @returns {Promise<string>} The slug/ID of the created wedding (safeName without .json)
  */
-export async function createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }) {
+export async function createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }, ownerMail) {
+  const dateStr = String(weddingDate).slice(0, 10);
+  const slug = `${slugify(partner1Name)}-${slugify(partner2Name)}-${dateStr}`;
+
+  // If the dedicated REST API is not configured, fall back to S3 upload
   if (!WEDDINGS_API_BASE) {
-    throw new Error("Weddings API base URL is not configured (REACT_APP_WEDDINGS_API_BASE).");
+    const emptyData = {
+      weddingName: slug,
+      displayName: `${partner1Name} & ${partner2Name}`,
+      exportDate: new Date().toISOString(),
+      totalGuests: 0,
+      totalTables: 0,
+      guestList: [],
+      tables: [],
+      tableAliases: {},
+      tableSizes: {},
+      tableNumbers: {},
+      metadata: { viewMode: "list", isGrouped: true, version: "1.0" },
+    };
+    await createWedding(slug, emptyData, ownerMail);
+    return slug;
   }
+
   const response = await fetch(`${WEDDINGS_API_BASE}/api/weddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -115,7 +134,5 @@ export async function createWeddingWithDetails({ partner1Name, partner2Name, wed
   // Extract slug from response: prefer safeName, then strip .json from fileName
   if (data?.safeName) return data.safeName;
   if (data?.fileName) return data.fileName.replace(/\.json$/i, "");
-  // Fallback: construct the safeName locally, matching the server's Sanitize logic
-  const dateStr = String(weddingDate).slice(0, 10);
-  return `${slugify(partner1Name)}-${slugify(partner2Name)}-${dateStr}`;
+  return slug;
 }

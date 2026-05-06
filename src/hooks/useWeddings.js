@@ -62,7 +62,7 @@ export function useWeddings({ ownerMail } = {}) {
       }
       setSaving(true);
       try {
-        const slug = await createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue });
+        const slug = await createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }, ownerMail);
         const next = [...items, slug];
         setItems(next);
         writeBackup(next);
@@ -71,7 +71,7 @@ export function useWeddings({ ownerMail } = {}) {
         setSaving(false);
       }
     },
-    [items, toSlug, writeBackup]
+    [items, ownerMail, toSlug, writeBackup]
   );
 
   const removeWedding = useCallback(
