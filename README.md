@@ -36,6 +36,15 @@ A modern, full-featured wedding and event seating arrangement management applica
 - **Group Tickets PDF:** Export tickets organized by party group.
 - **JSON Backup & Restore:** Export full raw arrangement datasets in JSON format for offline backups or migration.
 
+### 👤 User Account & Subscriptions
+- **User Profile Menu:** Quick-access dropdown on both dashboard and seating canvas showing user details, settings shortcut, and logout.
+- **Account & Subscription Management:** Dedicated `/account` view detailing user credentials, active plan status, and subscription tier comparison tailored for event planners (Básico, Profesional, and Agencia / Ilimitado).
+
+### 🕒 Automatic Backups & Recovery
+- **Weekly Rolling Backups:** Automatically creates snapshot backups (`_backup_<timestamp>`) when arrangements are saved and at least 7 days have passed since the previous backup.
+- **Retention Policy:** Automatically prunes old snapshots to keep up to 2 rolling backups per wedding.
+- **Restore Interface:** View existing backup history and restore previous arrangement states directly from the settings modal.
+
 ### 🌐 Internationalization (i18n)
 - **Bilingual Interface:** Full support for English and Spanish (Español).
 - **Configurable Settings:** Persisted language preferences and default table size settings stored locally.
@@ -69,8 +78,9 @@ sitting-chart/
 ├── src/
 │   ├── components/             # React UI components
 │   │   ├── buttonAddWedding/   # Wedding list, create forms, and dialogs
-│   │   ├── common/             # Global providers (NotificationProvider)
-│   │   ├── ConfigurationModal  # Settings and CSV import/export modal
+│   │   ├── common/             # Global providers & UserMenu
+│   │   ├── AccountPage         # Account info & subscription tiers view
+│   │   ├── ConfigurationModal  # Settings, CSV import/export & backup restore modal
 │   │   ├── ContextMenu         # Contextual table/guest actions
 │   │   ├── CSVImporter         # CSV parser and sample generator
 │   │   ├── GuestManagerModal   # Guest management, groups, and companions
@@ -82,7 +92,7 @@ sitting-chart/
 │   ├── config/
 │   │   └── api.js              # Centralized API and backend endpoints
 │   ├── hooks/                  # Custom React hooks (useWeddings, useSeatingTranslation)
-│   ├── utils/                  # Helper utilities (guests, translations, slug, debug)
+│   ├── utils/                  # Helper utilities (backupService, guests, translations, slug, debug)
 │   │   └── translations/       # English & Spanish translation dictionaries
 │   ├── App.js                  # App router configuration
 │   └── index.js                # App entry point with OIDC provider setup
