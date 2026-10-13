@@ -330,6 +330,7 @@ export const englishTranslations = {
     'changeLogo': 'Change Logo',
     'removeLogo': 'Remove Logo',
     'noLogoSelected': 'No logo uploaded yet.',
+    'brandingSavedSuccess': 'Branding updated successfully! It will now appear on your exported PDFs and workspace.',
 };
 
 export default englishTranslations;

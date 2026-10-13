@@ -330,6 +330,7 @@ export const spanishTranslations = {
     'changeLogo': 'Cambiar Logotipo',
     'removeLogo': 'Eliminar Logotipo',
     'noLogoSelected': 'Aún no has subido ningún logotipo.',
+    'brandingSavedSuccess': '¡Marca guardada con éxito! Se aplicará en tus PDFs exportados y en el espacio de trabajo.',
 };
 
 export default spanishTranslations;
