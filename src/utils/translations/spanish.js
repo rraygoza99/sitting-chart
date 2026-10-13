@@ -16,6 +16,9 @@ export const spanishTranslations = {
     'import': 'Importar',
     'loading': 'Cargando...',
     'saving': 'Guardando...',
+    'saved': 'Guardado',
+    'autoSaved': 'Guardado automático',
+    'unsavedChanges': 'Cambios sin guardar',
     'deleting': 'Eliminando...',
     'error': 'Error',
     'success': 'Éxito',
@@ -46,7 +49,7 @@ export const spanishTranslations = {
     'activeWeddings': 'bodas activas',
     'unlimitedWeddings': 'Bodas activas ilimitadas',
     'fullSeatingCanvas': 'Lienzo completo de asignación de mesas',
-    'csvImport': 'Importación y exportación de invitados por CSV',
+    'csvImportFeature': 'Importación y exportación de invitados por CSV',
     'pdfExportsAll': 'Generación de PDFs (Alfabético, Mesas, Boletos)',
     'basicSupport': 'Soporte estándar',
     'allBasicFeatures': 'Todo lo del Plan Básico',
@@ -314,6 +317,19 @@ export const spanishTranslations = {
     'inquiryMessage': 'Mensaje detallado',
     'inquiryMessagePlaceholder': 'Cuéntanos con detalle qué ocurrió o en qué te podemos ayudar...',
     'sendInquiry': 'Enviar Reporte',
+
+    // Branding
+    'plannerBranding': 'Marca y Logotipo del Organizador',
+    'plannerBrandingDesc': 'Personaliza tu logotipo, nombre de empresa y datos de contacto. Aparecerán en los PDFs exportados y en el espacio de trabajo.',
+    'brandingCompanyName': 'Nombre de la Empresa / Wedding Planner',
+    'brandingCompanyNamePlaceholder': 'ej. Elegance Bodas & Eventos',
+    'brandingTagline': 'Eslogan / Sitio Web / Teléfono de Contacto',
+    'brandingTaglinePlaceholder': 'ej. www.elegancebodas.mx | +52 55 1234 5678',
+    'brandingLogo': 'Logotipo',
+    'uploadLogo': 'Subir Logotipo (PNG / JPG)',
+    'changeLogo': 'Cambiar Logotipo',
+    'removeLogo': 'Eliminar Logotipo',
+    'noLogoSelected': 'Aún no has subido ningún logotipo.',
 };
 
 export default spanishTranslations;

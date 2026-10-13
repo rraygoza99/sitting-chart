@@ -18,10 +18,6 @@ import LogoutIcon from '@mui/icons-material/Logout';
 
 import { useSeatingTranslation } from '../../hooks/useSeatingTranslation';
 
-const clientId = '5p565e420hon8ith2m655n0krh';
-const logoutUri = 'https://master.d3mmpbz9sdxh3s.amplifyapp.com/login';
-const cognitoDomain = 'https://sitting-chart.auth.us-east-2.amazoncognito.com';
-
 export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }) {
     const auth = useAuth();
     const navigate = useNavigate();

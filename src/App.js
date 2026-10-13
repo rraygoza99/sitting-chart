@@ -1,5 +1,4 @@
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { useAuth } from 'react-oidc-context';
 import EditableList from './components/buttonAddWedding/EditableList';
 import './App.css';
 import SeatingCanvas from './components/SeatingCanvas';

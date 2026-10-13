@@ -2,10 +2,6 @@ import React from "react";
 import { useAuth } from "react-oidc-context";
 import { Navigate } from "react-router-dom";
 
-const clientId = "5p565e420hon8ith2m655n0krh";
-const logoutUri = "https://master.d3mmpbz9sdxh3s.amplifyapp.com/login";
-const cognitoDomain = "https://sitting-chart.auth.us-east-2.amazoncognito.com";
-
 const Login = () => {
   const auth = useAuth();
 

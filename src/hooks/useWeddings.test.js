@@ -1,25 +1,23 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import { useWeddings } from './useWeddings';
-import { listWeddings, createWedding, deleteWedding } from '../utils/weddingsService';
+import { listWeddings, createWeddingWithDetails, deleteWedding } from '../utils/weddingsService';
 
 jest.mock('../utils/weddingsService', () => ({
   listWeddings: jest.fn(),
-  createWedding: jest.fn(),
+  createWeddingWithDetails: jest.fn(),
   deleteWedding: jest.fn(),
 }));
 
 
 function Harness({ ownerMail, action }) {
   const hook = useWeddings({ ownerMail });
-  const [hasRun, setHasRun] = React.useState(false);
 
   React.useEffect(() => {
-    if (action && !hasRun) {
-      setHasRun(true);
+    if (action) {
       action(hook);
     }
-  }, [action, hasRun, hook]);
+  }, [action, hook]);
 
   return (
     <div>
@@ -58,29 +56,38 @@ test('falls back to localStorage on load failure', async () => {
 
 test('addWedding adds and persists (slugifies displayName)', async () => {
   listWeddings.mockResolvedValueOnce([]);
-  createWedding.mockResolvedValueOnce();
+  createWeddingWithDetails.mockResolvedValueOnce('john-jane-2026-10-15');
 
   let hookApi;
   render(<Harness ownerMail="user@example.com" action={(h) => (hookApi = h)} />);
 
   await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('0'));
-  await hookApi.addWedding('New Wedding');
+  await act(async () => {
+    await hookApi.addWedding({
+      partner1Name: 'John',
+      partner2Name: 'Jane',
+      weddingDate: '2026-10-15',
+    });
+  });
 
-  expect(screen.getByTestId('items').textContent).toBe('new-wedding');
-  expect(JSON.parse(localStorage.getItem('weddingItems'))).toEqual(['new-wedding']);
+  expect(screen.getByTestId('items').textContent).toBe('john-jane-2026-10-15');
+  expect(JSON.parse(localStorage.getItem('weddingItems'))).toEqual(['john-jane-2026-10-15']);
 });
 
 test('addWedding validation: duplicate name', async () => {
-  listWeddings.mockResolvedValueOnce(['Alpha']);
-  render(<Harness ownerMail="user@example.com" />);
-  await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('0'));
-  await expect(screen.findByTestId('items')).resolves.toBeTruthy();
-
-  // Access the hook by re-rendering with action
+  listWeddings.mockResolvedValueOnce(['john-jane-2026-10-15']);
   let hookApi;
   render(<Harness ownerMail="user@example.com" action={(h) => (hookApi = h)} />);
+  await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('0'));
+  expect(screen.getByTestId('items').textContent).toBe('john-jane-2026-10-15');
 
-  await expect(hookApi.addWedding('Alpha')).rejects.toThrow('Wedding name already exists!');
+  await expect(
+    hookApi.addWedding({
+      partner1Name: 'John',
+      partner2Name: 'Jane',
+      weddingDate: '2026-10-15',
+    })
+  ).rejects.toThrow('Wedding name already exists!');
 });
 
 test('deleteWedding removes and cleans localStorage', async () => {
@@ -93,7 +100,9 @@ test('deleteWedding removes and cleans localStorage', async () => {
   render(<Harness ownerMail="user@example.com" action={(h) => (hookApi = h)} />);
 
   await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('0'));
-  await hookApi.deleteWedding('Alpha');
+  await act(async () => {
+    await hookApi.deleteWedding('Alpha');
+  });
 
   expect(screen.getByTestId('items').textContent).toBe('');
   expect(JSON.parse(localStorage.getItem('weddingItems'))).toEqual([]);

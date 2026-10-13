@@ -36,6 +36,11 @@ A modern, full-featured wedding and event seating arrangement management applica
 - **Group Tickets PDF:** Export tickets organized by party group.
 - **JSON Backup & Restore:** Export full raw arrangement datasets in JSON format for offline backups or migration.
 
+### 🎨 Planner Branding & White-labeling
+- **Company Name & Tagline:** Set your event planning business name and contact information/website.
+- **Custom Logo Upload:** Upload your planner logo (PNG/JPG/WEBP).
+- **Workspace & PDF Integration:** Custom branding and logo automatically appear on the seating arrangement top bar and header of all exported PDF reports (Alphabetical, Grouped, and Guest Tickets).
+
 ### 👤 User Account & Subscriptions
 - **User Profile Menu:** Quick-access dropdown on both dashboard and seating canvas showing user details, settings shortcut, and logout.
 - **Account & Subscription Management:** Dedicated `/account` view detailing user credentials, active plan status, and subscription tier comparison tailored for event planners (Básico, Profesional, and Agencia / Ilimitado).

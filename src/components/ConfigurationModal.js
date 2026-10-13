@@ -14,6 +14,7 @@ import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import { S3_API_BASE } from '../config/api';
 import { listWeddingBackups } from '../utils/backupService';
 import { getWedding } from '../utils/weddingsService';
+import { getPlannerBranding, savePlannerBranding } from '../utils/brandingService';
 
 const ConfigurationModal = ({ 
     onExportToJSON, 
@@ -22,6 +23,7 @@ const ConfigurationModal = ({
     onDownloadSampleCSV,
     onLanguageChange,
     onRestoreBackup,
+    onBrandingChange,
     weddingId,
     existingGuests = [],
     existingTables = [],
@@ -35,6 +37,11 @@ const ConfigurationModal = ({
     const [language, setLanguage] = useState('english'); // 'english' or 'spanish'
     const [backups, setBackups] = useState([]);
     const [loadingBackups, setLoadingBackups] = useState(false);
+    
+    // Planner Branding State
+    const [companyName, setCompanyName] = useState('');
+    const [tagline, setTagline] = useState('');
+    const [logoDataUrl, setLogoDataUrl] = useState('');
     
     // Controlled or uncontrolled open state
     const open = isOpen !== undefined ? isOpen : internalOpen;
@@ -53,7 +60,7 @@ const ConfigurationModal = ({
         }
     }, [open, weddingId]);
 
-    // Load saved configuration on component mount
+    // Load saved configuration and branding on component mount
     useEffect(() => {
         const savedConfig = localStorage.getItem('seatingConfiguration');
         if (savedConfig) {
@@ -65,7 +72,14 @@ const ConfigurationModal = ({
                 console.error('Error loading configuration:', error);
             }
         }
-    }, []);
+
+        const branding = getPlannerBranding();
+        if (branding) {
+            setCompanyName(branding.companyName || '');
+            setTagline(branding.tagline || '');
+            setLogoDataUrl(branding.logoDataUrl || '');
+        }
+    }, [open]);
 
     const handleOpen = () => {
         if (onOpen) onOpen();
@@ -77,6 +91,27 @@ const ConfigurationModal = ({
         else setInternalOpen(false);
     };
 
+    const handleLogoUpload = (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Ensure reasonable image size (max 1.5MB)
+        if (file.size > 1.5 * 1024 * 1024) {
+            alert('Image size exceeds 1.5MB. Please choose a smaller image.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (uploadEvent) => {
+            setLogoDataUrl(uploadEvent.target.result);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveLogo = () => {
+        setLogoDataUrl('');
+    };
+
     const handleSave = () => {
         // Save the configuration to localStorage
         const config = {
@@ -84,6 +119,18 @@ const ConfigurationModal = ({
             language: language
         };
         localStorage.setItem('seatingConfiguration', JSON.stringify(config));
+
+        // Save branding to localStorage
+        const newBranding = {
+            companyName: companyName.trim(),
+            tagline: tagline.trim(),
+            logoDataUrl: logoDataUrl,
+        };
+        savePlannerBranding(newBranding);
+
+        if (onBrandingChange) {
+            onBrandingChange(newBranding);
+        }
         
         // Notify parent component of language change
         if (onLanguageChange) {
@@ -227,6 +274,89 @@ const ConfigurationModal = ({
                     <Typography variant="body1" sx={{ mb: 3 }}>
                         {t('configureSeatingSettings')}
                     </Typography>
+
+                    {/* Planner Branding Settings */}
+                    <Box sx={{ mb: 3 }}>
+                        <Typography variant="h6" sx={{ mb: 1 }}>
+                            🎨 {t('plannerBranding') || 'Planner Branding'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            {t('plannerBrandingDesc') || 'Customize your logo, company name and tagline. This branding will appear on exported PDFs and your seating canvas.'}
+                        </Typography>
+
+                        <TextField
+                            fullWidth
+                            label={t('brandingCompanyName') || 'Company / Planner Name'}
+                            value={companyName}
+                            onChange={(e) => setCompanyName(e.target.value)}
+                            placeholder={t('brandingCompanyNamePlaceholder') || 'e.g. Elegance Weddings & Events'}
+                            variant="outlined"
+                            sx={{ mb: 2 }}
+                        />
+
+                        <TextField
+                            fullWidth
+                            label={t('brandingTagline') || 'Tagline / Contact Phone / Website'}
+                            value={tagline}
+                            onChange={(e) => setTagline(e.target.value)}
+                            placeholder={t('brandingTaglinePlaceholder') || 'e.g. www.eleganceweddings.mx | +52 55 1234 5678'}
+                            variant="outlined"
+                            sx={{ mb: 2 }}
+                        />
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 2, bgcolor: '#fbfcfe', border: '1px dashed #bbb', borderRadius: 1.5 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                {t('brandingLogo') || 'Planner Logo'}
+                            </Typography>
+                            {logoDataUrl ? (
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                    <Box
+                                        component="img"
+                                        src={logoDataUrl}
+                                        alt="Planner Logo"
+                                        sx={{
+                                            maxHeight: 60,
+                                            maxWidth: 160,
+                                            objectFit: 'contain',
+                                            bgcolor: '#fff',
+                                            p: 0.5,
+                                            border: '1px solid #ddd',
+                                            borderRadius: 1,
+                                        }}
+                                    />
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        size="small"
+                                        onClick={handleRemoveLogo}
+                                    >
+                                        {t('removeLogo') || 'Remove Logo'}
+                                    </Button>
+                                </Box>
+                            ) : (
+                                <Typography variant="caption" color="text.secondary">
+                                    {t('noLogoSelected') || 'No logo uploaded yet.'}
+                                </Typography>
+                            )}
+
+                            <div>
+                                <Button
+                                    variant="outlined"
+                                    component="label"
+                                    size="small"
+                                    sx={{ textTransform: 'none' }}
+                                >
+                                    {logoDataUrl ? (t('changeLogo') || 'Change Logo') : (t('uploadLogo') || 'Upload Logo (PNG / JPG)')}
+                                    <input
+                                        type="file"
+                                        hidden
+                                        accept="image/png, image/jpeg, image/webp"
+                                        onChange={handleLogoUpload}
+                                    />
+                                </Button>
+                            </div>
+                        </Box>
+                    </Box>
 
                     {/* Language Settings */}
                     <Box sx={{ mb: 3 }}>

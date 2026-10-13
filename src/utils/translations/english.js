@@ -16,6 +16,9 @@ export const englishTranslations = {
     'import': 'Import',
     'loading': 'Loading...',
     'saving': 'Saving...',
+    'saved': 'Saved',
+    'autoSaved': 'Auto-saved',
+    'unsavedChanges': 'Unsaved changes',
     'deleting': 'Deleting...',
     'error': 'Error',
     'success': 'Success',
@@ -46,7 +49,7 @@ export const englishTranslations = {
     'activeWeddings': 'active weddings',
     'unlimitedWeddings': 'Unlimited active weddings',
     'fullSeatingCanvas': 'Full interactive seating canvas',
-    'csvImport': 'CSV guest list import and export',
+    'csvImportFeature': 'CSV guest list import and export',
     'pdfExportsAll': 'PDF generation (Alphabetical, Tables, Tickets)',
     'basicSupport': 'Standard support',
     'allBasicFeatures': 'Everything in Basic',
@@ -314,6 +317,19 @@ export const englishTranslations = {
     'inquiryMessage': 'Detailed Message',
     'inquiryMessagePlaceholder': 'Please describe what happened or what you need assistance with...',
     'sendInquiry': 'Send Report',
+
+    // Branding
+    'plannerBranding': 'Planner Branding & Logo',
+    'plannerBrandingDesc': 'Customize your logo, company name, and contact details. This will appear on exported PDFs and your seating workspace.',
+    'brandingCompanyName': 'Planner / Agency Name',
+    'brandingCompanyNamePlaceholder': 'e.g. Elegance Weddings & Events',
+    'brandingTagline': 'Tagline / Website / Contact Info',
+    'brandingTaglinePlaceholder': 'e.g. www.eleganceweddings.mx | +52 55 1234 5678',
+    'brandingLogo': 'Planner Logo',
+    'uploadLogo': 'Upload Logo (PNG / JPG)',
+    'changeLogo': 'Change Logo',
+    'removeLogo': 'Remove Logo',
+    'noLogoSelected': 'No logo uploaded yet.',
 };
 
 export default englishTranslations;

@@ -55,7 +55,7 @@ export default function AccountPage() {
             weddingsLimit: '3 ' + (t('activeWeddings') || 'bodas activas'),
             features: [
                 t('fullSeatingCanvas') || 'Lienzo completo de asignación de mesas',
-                t('csvImport') || 'Importación y exportación de invitados por CSV',
+                t('csvImportFeature') || 'Importación y exportación de invitados por CSV',
                 t('pdfExportsAll') || 'Generación de PDFs (Alfabético, Mesas, Boletos)',
                 t('basicSupport') || 'Soporte estándar',
             ],

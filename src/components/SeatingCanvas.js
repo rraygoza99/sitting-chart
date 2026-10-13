@@ -34,6 +34,7 @@ import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import { useNotification } from './common/NotificationProvider';
 import { getWedding, saveWedding } from '../utils/weddingsService';
 import { handleWeeklyBackup } from '../utils/backupService';
+import { getPlannerBranding } from '../utils/brandingService';
 import { addGuestsUnique, dedupeGuests, normalizeGuestData, generateUniqueGuestId } from '../utils/guests';
 import { logSeating, findDuplicatesById, summarizeIds } from '../utils/debug';
 
@@ -146,8 +147,12 @@ function SeatingCanvas({ guests = [] }) {
     const [searchTerm, setSearchTerm] = useState(''); // Search functionality
     const [currentLanguage, setCurrentLanguage] = useState('english'); // Language state
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track unsaved changes
+    const [saveStatus, setSaveStatus] = useState('saved'); // 'saved' | 'saving' | 'unsaved'
     const [isLoading, setIsLoading] = useState(false); // Loading state for server operations
     const [configModalOpen, setConfigModalOpen] = useState(false); // Settings modal state
+    const [plannerBranding, setPlannerBranding] = useState(() => getPlannerBranding());
+    const isInitialLoadedRef = useRef(false);
+    const autoSaveTimerRef = useRef(null);
     
     // Split button state for Add actions
     const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -342,6 +347,8 @@ function SeatingCanvas({ guests = [] }) {
                 
                 // No unsaved changes when loading from server
                 setHasUnsavedChanges(false);
+                setSaveStatus('saved');
+                isInitialLoadedRef.current = true;
             } else {
                 // Server failed to load data - show error message
                 notify.error('Failed to load wedding data from server. Please check your connection and try again.');
@@ -358,9 +365,12 @@ function SeatingCanvas({ guests = [] }) {
                 setTableSizes({});
                 setTableNumbers({});
                 setHasUnsavedChanges(false);
+                setSaveStatus('saved');
+                isInitialLoadedRef.current = true;
             }
         };
 
+        isInitialLoadedRef.current = false;
         loadWeddingData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [weddingId]);
@@ -411,11 +421,13 @@ function SeatingCanvas({ guests = [] }) {
         notify.success(t('importSuccessful', { count: newGuests.length }));
     };
 
-const saveArrangement = async () => {
+const saveArrangement = async (isAutoSave = false) => {
         if (!weddingId) {
-            notify.error('Cannot save: No wedding ID provided');
+            if (!isAutoSave) notify.error('Cannot save: No wedding ID provided');
             return;
         }
+
+        setSaveStatus('saving');
 
         const dataToSave = {
             weddingName: weddingId,
@@ -441,11 +453,41 @@ const saveArrangement = async () => {
         if (success) {
             // Reset unsaved changes flag after successful save
             setHasUnsavedChanges(false);
-            notify.success(t('arrangementSaved'));
+            setSaveStatus('saved');
+            if (!isAutoSave) {
+                notify.success(t('arrangementSaved'));
+            }
         } else {
-            notify.error('Failed to save to server. Please check your connection and try again.');
+            setSaveStatus('unsaved');
+            if (!isAutoSave) {
+                notify.error('Failed to save to server. Please check your connection and try again.');
+            }
         }
     };
+
+    // Auto-save effect: triggers 3 seconds after changes when loaded
+    useEffect(() => {
+        if (!isInitialLoadedRef.current || !hasUnsavedChanges || !weddingId) {
+            return;
+        }
+
+        setSaveStatus('unsaved');
+
+        if (autoSaveTimerRef.current) {
+            clearTimeout(autoSaveTimerRef.current);
+        }
+
+        autoSaveTimerRef.current = setTimeout(() => {
+            saveArrangement(true);
+        }, 3000);
+
+        return () => {
+            if (autoSaveTimerRef.current) {
+                clearTimeout(autoSaveTimerRef.current);
+            }
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasUnsavedChanges, guestList, tables, tableAliases, tableSizes, tableNumbers, customGroups, weddingId]);
 
     // Undo system functions
     const saveStateToHistory = (actionDescription) => {
@@ -502,10 +544,54 @@ const saveArrangement = async () => {
         setTableNumbers({}); // Reset table numbers
     setCustomGroups([]); // Reset custom groups
     notify.warning(t('arrangementDeleted'));
-    };    const exportToPDF = () => {
-        const doc = new jsPDF();
+    };    // Helper to render planner branding on PDF documents
+    const addPDFBrandingHeader = (doc, titleText, startY = 15) => {
+        let currentY = startY;
+        const pageWidth = doc.internal.pageSize.getWidth();
+
+        if (plannerBranding && (plannerBranding.logoDataUrl || plannerBranding.companyName)) {
+            // Draw logo on top right if present
+            if (plannerBranding.logoDataUrl) {
+                try {
+                    // Place logo on top right corner
+                    doc.addImage(plannerBranding.logoDataUrl, 'PNG', pageWidth - 45, 8, 35, 15, undefined, 'FAST');
+                } catch (e) {
+                    console.warn('Could not render logo in PDF:', e);
+                }
+            }
+
+            // Draw Company Name & Tagline
+            if (plannerBranding.companyName) {
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(100, 100, 100);
+                doc.text(plannerBranding.companyName.toUpperCase(), 10, currentY);
+                currentY += 5;
+
+                if (plannerBranding.tagline) {
+                    doc.setFontSize(8);
+                    doc.setFont(undefined, 'normal');
+                    doc.setTextColor(130, 130, 130);
+                    doc.text(plannerBranding.tagline, 10, currentY);
+                    currentY += 6;
+                }
+            }
+            doc.setTextColor(0, 0, 0); // reset color
+        }
+
+        // Main Document Title
         doc.setFontSize(16);
-        doc.text(t('weddingSeatingArrangement'), 10, 10);
+        doc.setFont(undefined, 'bold');
+        doc.text(titleText, 10, currentY + 4);
+        currentY += 12;
+
+        return currentY;
+    };
+
+    const exportToPDF = () => {
+        const doc = new jsPDF();
+        let currentY = addPDFBrandingHeader(doc, t('weddingSeatingArrangement'), 12);
+        currentY += 4;
 
         const allGuests = [];
         tables.forEach((table, tableIndex) => {
@@ -532,7 +618,6 @@ const saveArrangement = async () => {
             return lastNameA.localeCompare(lastNameB);
         });
 
-        let currentY = 30;
         const pageHeight = 280;
         const rowHeight = 8;
         const columnWidths = [60, 60, 30];
@@ -587,10 +672,9 @@ const saveArrangement = async () => {
 
     const exportToPDFGroupedByTables = () => {
         const doc = new jsPDF();
-        doc.setFontSize(16);
-        doc.text(t('weddingSeatingArrangementGrouped'), 10, 10);
+        let currentY = addPDFBrandingHeader(doc, t('weddingSeatingArrangementGrouped'), 12);
+        currentY += 4;
 
-        let currentY = 30;
         const pageHeight = 280;
         const rowHeight = 8;
         const tableHeaderBaseHeight = 12;
@@ -738,19 +822,21 @@ const saveArrangement = async () => {
     const exportGuestTicketsToPDF = () => {
         const doc = new jsPDF();
         
-        // Title
-        doc.setFontSize(18);
-        doc.text(t('guestTicketList'), 20, 20);
+        let startY = addPDFBrandingHeader(doc, t('guestTicketList'), 12);
         
         // Wedding name if available
         if (weddingId) {
-            doc.setFontSize(14);
-            doc.text(`${t('wedding')}: ${weddingId}`, 20, 35);
+            doc.setFontSize(13);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${t('wedding')}: ${weddingId}`, 10, startY);
+            startY += 6;
         }
         
         // Date
-        doc.setFontSize(12);
-        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 50);
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 10, startY);
+        startY += 10;
         
         // Get all guests (from guest list and tables) and calculate tickets
         const allGuests = [...guestList, ...tables.flat()];
@@ -786,16 +872,16 @@ const saveArrangement = async () => {
         // Table headers
         doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.text('Guest Name', 20, 70);
-        doc.text('Adults', 130, 70);
-        doc.text('Children', 160, 70);
+        doc.text('Guest Name', 10, startY);
+        doc.text('Adults', 130, startY);
+        doc.text('Children', 160, startY);
         
         // Draw header line
-        doc.line(20, 72, 190, 72);
+        doc.line(10, startY + 2, 190, startY + 2);
         
         // Table data
         doc.setFont(undefined, 'normal');
-        let yPosition = 80;
+        let yPosition = startY + 8;
         let totalTickets = 0;
         let totalChildren = 0;
         
@@ -844,19 +930,21 @@ const saveArrangement = async () => {
     const exportGuestTicketsByGroupToPDF = () => {
         const doc = new jsPDF();
 
-        // Title
-        doc.setFontSize(18);
-        doc.text(t('guestTicketsByGroup'), 20, 20);
+        let startY = addPDFBrandingHeader(doc, t('guestTicketsByGroup'), 12);
 
         // Wedding name if available
         if (weddingId) {
-            doc.setFontSize(14);
-            doc.text(`${t('wedding')}: ${weddingId}`, 20, 35);
+            doc.setFontSize(13);
+            doc.setFont(undefined, 'normal');
+            doc.text(`${t('wedding')}: ${weddingId}`, 10, startY);
+            startY += 6;
         }
 
         // Date
-        doc.setFontSize(12);
-        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 50);
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, 10, startY);
+        startY += 10;
 
         const allGuests = [...guestList, ...tables.flat()];
         const guestGroupMap = new Map();
@@ -870,7 +958,7 @@ const saveArrangement = async () => {
             }
         });
 
-        let yPosition = 70;
+        let yPosition = startY;
 
         // Sort groups by name
         const sortedGroups = Array.from(guestGroupMap.keys()).sort();
@@ -2030,7 +2118,7 @@ const saveArrangement = async () => {
             
             {/* Top Action Bar */}
                 <TopActionBar
-                    onSave={saveArrangement}
+                    onSave={() => saveArrangement(false)}
                     onExportAlphabetical={exportToPDF}
                     onExportGrouped={exportToPDFGroupedByTables}
                     onExportTickets={exportGuestTicketsToPDF}
@@ -2038,10 +2126,12 @@ const saveArrangement = async () => {
                     onUndo={performUndo}
                     canUndo={undoHistory.length > 0}
                     hasUnsavedChanges={hasUnsavedChanges}
+                    saveStatus={saveStatus}
                     currentLanguage={currentLanguage}
                     isDisabled={isLoading}
                     totalSeatedGuests={totalSeatedGuests}
                     onOpenSettings={() => setConfigModalOpen(true)}
+                    branding={plannerBranding}
                 />
             <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}
@@ -2054,6 +2144,7 @@ const saveArrangement = async () => {
                         onCSVImport={handleCSVImport}
                         onDownloadSampleCSV={downloadSampleCSV}
                         onLanguageChange={handleLanguageChange}
+                        onBrandingChange={(newBranding) => setPlannerBranding(newBranding)}
                         onRestoreBackup={(backupData) => {
                             const contentData = backupData.content || backupData;
                             const restoredGuests = contentData.guestList || contentData.savedGuestList || [];

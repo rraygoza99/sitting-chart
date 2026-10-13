@@ -18,6 +18,9 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
+import Chip from '@mui/material/Chip';
+import CircularProgress from '@mui/material/CircularProgress';
+import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import './TopActionBar.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import UserMenu from './common/UserMenu';
@@ -32,9 +35,11 @@ function TopActionBar({
     onUndo,
     canUndo = false,
     hasUnsavedChanges = false, // Add prop to track unsaved changes
+    saveStatus = 'saved', // 'saved' | 'saving' | 'unsaved' | 'idle'
     currentLanguage = 'english', // Add currentLanguage prop
     totalSeatedGuests = 0,
-    onOpenSettings
+    onOpenSettings,
+    branding = {}
 }) {
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -106,6 +111,30 @@ function TopActionBar({
                     >
                         <HomeIcon />
                     </IconButton>
+
+                    {branding && (branding.logoDataUrl || branding.companyName) && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: '12px', overflow: 'hidden' }}>
+                            {branding.logoDataUrl && (
+                                <img
+                                    src={branding.logoDataUrl}
+                                    alt="Planner Logo"
+                                    style={{ maxHeight: '36px', maxWidth: '100px', objectFit: 'contain' }}
+                                />
+                            )}
+                            {branding.companyName && (
+                                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                    <span style={{ fontWeight: 600, fontSize: '0.95rem', color: '#2c3e50', lineHeight: 1.2 }}>
+                                        {branding.companyName}
+                                    </span>
+                                    {branding.tagline && (
+                                        <span style={{ fontSize: '0.75rem', color: '#7f8c8d', lineHeight: 1.1 }}>
+                                            {branding.tagline}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
                 
                 <div className="top-action-bar-center">
@@ -114,9 +143,33 @@ function TopActionBar({
                 
                 <div className="top-action-bar-right">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span style={{ fontWeight: 500, fontSize: 15, color: '#333', marginRight: 8 }}>
+                        <span style={{ fontWeight: 500, fontSize: 15, color: '#333', marginRight: 4 }}>
                             {t('totalSeatedGuests') || 'Total Seated Guests'}: {totalSeatedGuests}
                         </span>
+
+                        {/* Save / Auto-save Status Indicator */}
+                        {saveStatus === 'saving' ? (
+                            <Chip
+                                size="small"
+                                icon={<CircularProgress size={13} color="inherit" />}
+                                label={t('saving')}
+                                sx={{ bgcolor: '#e3f2fd', color: '#1565c0', fontWeight: 500, fontSize: '0.8rem' }}
+                            />
+                        ) : hasUnsavedChanges ? (
+                            <Chip
+                                size="small"
+                                label={t('unsavedChanges')}
+                                sx={{ bgcolor: '#fff3e0', color: '#e65100', fontWeight: 500, fontSize: '0.8rem' }}
+                            />
+                        ) : (
+                            <Chip
+                                size="small"
+                                icon={<CheckCircleOutlineIcon sx={{ fontSize: '15px !important', color: '#2e7d32' }} />}
+                                label={t('saved')}
+                                sx={{ bgcolor: '#e8f5e9', color: '#2e7d32', fontWeight: 500, fontSize: '0.8rem' }}
+                            />
+                        )}
+
                         <IconButton
                             variant="contained"
                             color="secondary"
