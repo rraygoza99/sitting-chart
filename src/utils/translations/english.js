@@ -28,6 +28,12 @@ export const englishTranslations = {
     'search': 'Search',
     'home': 'Home',
     'undo': 'Undo',
+    'account': 'Account',
+    'accountDetails': 'Account Details',
+    'username': 'Username',
+    'email': 'Email',
+    'logout': 'Log out',
+    'userMenu': 'User menu',
     
     // Navigation and Actions
         // Navigation

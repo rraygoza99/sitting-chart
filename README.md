@@ -1,70 +1,143 @@
-# Getting Started with Create React App
+# Sitting Chart
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern, full-featured wedding and event seating arrangement management application built with React and Material-UI. It streamlines guest list management, interactive table assignments, drag-and-drop seating, multi-format PDF generation, and secure cloud synchronization.
+
+---
+
+## Features
+
+### 💍 Wedding & Event Management
+- **Multi-Wedding Dashboard:** Create, list, search, and manage multiple weddings and events.
+- **Event Metadata:** Track event name, partner names, date, and venue details.
+- **Collaboration & Sharing:** Share wedding seating arrangements with other registered users via email.
+- **Access Control:** User-scoped wedding access integrated with cloud authentication.
+
+### 👥 Guest Management
+- **Guest Manager Modal:** Add, edit, rename, and delete individual guests or party groups.
+- **Party & Companion Support:** Add Plus-One (`+1`, `+2`) companions and flag child guests (`isChild`).
+- **Group Categorization:** Organize guests into custom groups/parties (e.g., Family, Groom Friends, Bride Colleagues).
+- **Table Captains:** Assign table captain designations for seating leaders.
+- **CSV Bulk Import:** Import guest lists directly from CSV with auto-detection of party sizes, children, and groups (includes downloadable sample template).
+- **Search & Filter:** Real-time search across all guests, tables, and unassigned guest pools.
+
+### 🪑 Table & Seating Canvas
+- **Interactive Seating Workspace:** Visual table cards with real-time seat counts and capacity badges.
+- **Customizable Tables:** Configure table numbers, aliases (custom names), and max seat capacities.
+- **Drag-and-Drop & Context Actions:** Move or swap guests between tables seamlessly.
+- **Visual Occupancy Indicators:** Instant color cues for available, full, and over-capacity tables.
+- **Multi-View Modes:** Switch between standard list views, grouped views, and visual layout views.
+- **Undo History:** Built-in multi-level undo stack (up to 10 historical actions) for table and seating modifications.
+- **Unsaved Changes Protection:** Navigation warnings prevent accidental loss of arrangement data.
+
+### 📄 Export & Reporting
+- **Alphabetical Guest List PDF:** Export comprehensive guest directories sorted alphabetically by last name, with separate sections for adults and children.
+- **Table-Grouped Seating PDF:** Print seating charts organized by table number with table captain badges and guest lists.
+- **Guest Tickets PDF:** Generate printable place-cards / ticket lists showing guest names, companion counts, and assigned tables.
+- **Group Tickets PDF:** Export tickets organized by party group.
+- **JSON Backup & Restore:** Export full raw arrangement datasets in JSON format for offline backups or migration.
+
+### 🌐 Internationalization (i18n)
+- **Bilingual Interface:** Full support for English and Spanish (Español).
+- **Configurable Settings:** Persisted language preferences and default table size settings stored locally.
+
+### 🔒 Authentication & Cloud Storage
+- **OIDC Authentication:** Secure sign-in powered by AWS Cognito via OIDC with automatic silent token renewal.
+- **Cloud Persistence:** S3-backed JSON storage through AWS Lambda serverless endpoints, with localStorage fallbacks for offline resilience.
+
+---
+
+## Tech Stack
+
+| Category | Technology |
+| :--- | :--- |
+| **Frontend Framework** | React 19, React DOM |
+| **Routing** | React Router DOM v7 |
+| **UI Components & Icons** | Material-UI (MUI v7), `@mui/icons-material`, `@mui/x-data-grid` |
+| **Styling** | Emotion (`@emotion/react`, `@emotion/styled`), CSS3 |
+| **PDF Generation** | jsPDF |
+| **Authentication** | AWS Cognito, `react-oidc-context`, `oidc-client-ts` |
+| **Backend / Storage** | AWS Lambda (Serverless REST API), AWS S3 |
+| **Testing** | Jest, React Testing Library (`@testing-library/react`, `@testing-library/jest-dom`) |
+
+---
+
+## Project Structure
+
+```
+sitting-chart/
+├── public/                     # Static assets and HTML template
+├── src/
+│   ├── components/             # React UI components
+│   │   ├── buttonAddWedding/   # Wedding list, create forms, and dialogs
+│   │   ├── common/             # Global providers (NotificationProvider)
+│   │   ├── ConfigurationModal  # Settings and CSV import/export modal
+│   │   ├── ContextMenu         # Contextual table/guest actions
+│   │   ├── CSVImporter         # CSV parser and sample generator
+│   │   ├── GuestManagerModal   # Guest management, groups, and companions
+│   │   ├── Login               # Authentication entry point
+│   │   ├── ProtectedRoute      # OIDC route guard
+│   │   ├── SeatingCanvas       # Main seating arrangement workspace
+│   │   ├── TableList           # Table grid and seat cards
+│   │   └── TopActionBar        # Top controls, save, undo, and PDF export menu
+│   ├── config/
+│   │   └── api.js              # Centralized API and backend endpoints
+│   ├── hooks/                  # Custom React hooks (useWeddings, useSeatingTranslation)
+│   ├── utils/                  # Helper utilities (guests, translations, slug, debug)
+│   │   └── translations/       # English & Spanish translation dictionaries
+│   ├── App.js                  # App router configuration
+│   └── index.js                # App entry point with OIDC provider setup
+└── package.json
+```
+
+---
+
+## Getting Started
+
+### Prerequisites
+- Node.js (v18 or higher recommended)
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/rraygoza/sitting-chart.git
+   cd sitting-chart
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure environment variables (optional):
+   Create a `.env` file in the root directory:
+   ```env
+   REACT_APP_S3_API_BASE=https://<your-lambda-url>.on.aws/api/s3
+   REACT_APP_WEDDINGS_API_BASE=https://<your-weddings-api-url>
+   ```
+
+### Running Locally
+
+Start the development server:
+```bash
+npm start
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
+
+---
 
 ## Available Scripts
 
 In the project directory, you can run:
 
-### `npm start`
+- `npm start` – Runs the app in development mode with live reload.
+- `npm test` – Runs the test suite in interactive watch mode.
+- `npm run build` – Bundles the app for production in the `build/` folder.
+- `npm run eject` – Ejects Create React App configuration (one-way operation).
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+---
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## License
 
-### `npm test`
-
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
-
-### `npm run build`
-
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
-
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
-
-### `npm run eject`
-
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
-
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
-
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+This project is private and intended for event and wedding seating chart management.

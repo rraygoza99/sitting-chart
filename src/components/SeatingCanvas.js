@@ -146,6 +146,7 @@ function SeatingCanvas({ guests = [] }) {
     const [currentLanguage, setCurrentLanguage] = useState('english'); // Language state
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track unsaved changes
     const [isLoading, setIsLoading] = useState(false); // Loading state for server operations
+    const [configModalOpen, setConfigModalOpen] = useState(false); // Settings modal state
     
     // Split button state for Add actions
     const [addMenuOpen, setAddMenuOpen] = useState(false);
@@ -2033,10 +2034,14 @@ const saveArrangement = async () => {
                     currentLanguage={currentLanguage}
                     isDisabled={isLoading}
                     totalSeatedGuests={totalSeatedGuests}
+                    onOpenSettings={() => setConfigModalOpen(true)}
                 />
             <div style={{ display: 'flex' }} onClick={hideContextMenu}>
             {/* Configuration Modal Component */}
                     <ConfigurationModal
+                        isOpen={configModalOpen}
+                        onOpen={() => setConfigModalOpen(true)}
+                        onClose={() => setConfigModalOpen(false)}
                         onExportToJSON={exportToJSON}
                         onDeleteArrangement={deleteArrangement}
                         onCSVImport={handleCSVImport}

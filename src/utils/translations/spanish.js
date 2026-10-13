@@ -28,6 +28,12 @@ export const spanishTranslations = {
     'search': 'Buscar',
     'home': 'Inicio',
     'undo': 'Deshacer',
+    'account': 'Cuenta',
+    'accountDetails': 'Detalles de la Cuenta',
+    'username': 'Nombre de usuario',
+    'email': 'Correo electrónico',
+    'logout': 'Cerrar sesión',
+    'userMenu': 'Menú de usuario',
     
     // Navigation and Actions
         // Navigation

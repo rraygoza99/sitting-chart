@@ -20,6 +20,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import './TopActionBar.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
+import UserMenu from './common/UserMenu';
 
 function TopActionBar({ 
     onSave, 
@@ -32,7 +33,8 @@ function TopActionBar({
     canUndo = false,
     hasUnsavedChanges = false, // Add prop to track unsaved changes
     currentLanguage = 'english', // Add currentLanguage prop
-    totalSeatedGuests = 0
+    totalSeatedGuests = 0,
+    onOpenSettings
 }) {
     const [exportMenuOpen, setExportMenuOpen] = useState(false);
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -204,6 +206,8 @@ function TopActionBar({
                             </Grow>
                         )}
                     </Popper>
+
+                    <UserMenu onOpenSettings={onOpenSettings} currentLanguage={currentLanguage} />
                 </div>
             </div>
             

@@ -22,11 +22,17 @@ const ConfigurationModal = ({
     weddingId,
     existingGuests = [],
     existingTables = [],
-    currentLanguage = 'english' // Add currentLanguage prop
+    currentLanguage = 'english', // Add currentLanguage prop
+    isOpen,
+    onOpen,
+    onClose
 }) => {
-    const [open, setOpen] = useState(false);
+    const [internalOpen, setInternalOpen] = useState(false);
     const [defaultTableSize, setDefaultTableSize] = useState(10);
     const [language, setLanguage] = useState('english'); // 'english' or 'spanish'
+    
+    // Controlled or uncontrolled open state
+    const open = isOpen !== undefined ? isOpen : internalOpen;
     
     // Use translation hook
     const { t } = useSeatingTranslation(currentLanguage);
@@ -45,8 +51,15 @@ const ConfigurationModal = ({
         }
     }, []);
 
-    const handleOpen = () => setOpen(true);
-    const handleClose = () => setOpen(false);
+    const handleOpen = () => {
+        if (onOpen) onOpen();
+        else setInternalOpen(true);
+    };
+
+    const handleClose = () => {
+        if (onClose) onClose();
+        else setInternalOpen(false);
+    };
 
     const handleSave = () => {
         // Save the configuration to localStorage
@@ -61,7 +74,7 @@ const ConfigurationModal = ({
             onLanguageChange(language);
         }
         
-        setOpen(false);
+        handleClose();
     };
 
     // Share (add user) state and handler
