@@ -6,6 +6,7 @@ import SeatingCanvas from './components/SeatingCanvas';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import AccountPage from './components/AccountPage';
+import HelpPage from './components/HelpPage';
 import { NotificationProvider } from './components/common/NotificationProvider';
 
 const router = createBrowserRouter([
@@ -26,6 +27,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <AccountPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/help',
+    element: (
+      <ProtectedRoute>
+        <HelpPage />
       </ProtectedRoute>
     ),
   },

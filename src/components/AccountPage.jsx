@@ -21,11 +21,14 @@ import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import UserMenu from './common/UserMenu';
+import { getCurrentPlanId } from '../utils/subscriptionService';
 
 export default function AccountPage() {
     const auth = useAuth();
     const navigate = useNavigate();
     const { t } = useSeatingTranslation();
+
+    const activePlanId = getCurrentPlanId();
 
     const email = auth.user?.profile?.email || '';
     const username =
@@ -34,6 +37,13 @@ export default function AccountPage() {
         auth.user?.profile?.username ||
         email ||
         'User';
+
+    const handleSelectPlan = (planId) => {
+        try {
+            localStorage.setItem('userSubscriptionPlan', planId);
+            window.location.reload();
+        } catch (_) {}
+    };
 
     const plans = [
         {
@@ -49,7 +59,7 @@ export default function AccountPage() {
                 t('pdfExportsAll') || 'Generación de PDFs (Alfabético, Mesas, Boletos)',
                 t('basicSupport') || 'Soporte estándar',
             ],
-            isCurrent: false,
+            isCurrent: activePlanId === 'basic',
             highlighted: false,
         },
         {
@@ -66,7 +76,7 @@ export default function AccountPage() {
                 t('customTableCapacities') || 'Mesas y grupos personalizados ilimitados',
                 t('prioritySupport') || 'Soporte prioritario',
             ],
-            isCurrent: true,
+            isCurrent: activePlanId === 'pro',
             highlighted: true,
         },
         {
@@ -83,7 +93,7 @@ export default function AccountPage() {
                 t('multiUserTeams') || 'Múltiples organizadores simultáneos',
                 t('dedicatedSupport') || 'Soporte prioritario 24/7',
             ],
-            isCurrent: false,
+            isCurrent: activePlanId === 'agency',
             highlighted: false,
         },
     ];
@@ -154,7 +164,7 @@ export default function AccountPage() {
                         <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
                             <Chip
                                 icon={<WorkspacePremiumIcon />}
-                                label={`${t('currentPlan') || 'Plan Actual'}: ${t('planProName') || 'Profesional'}`}
+                                label={`${t('currentPlan') || 'Plan Actual'}: ${plans.find(p => p.id === activePlanId)?.name || t('planProName') || 'Profesional'}`}
                                 color="primary"
                                 sx={{ fontWeight: 600, px: 1, py: 2 }}
                             />
@@ -255,7 +265,7 @@ export default function AccountPage() {
                                             variant={plan.highlighted ? 'contained' : 'outlined'}
                                             color="primary"
                                             sx={{ textTransform: 'none', py: 1, fontWeight: 600 }}
-                                            onClick={() => alert(t('subscriptionComingSoon') || 'Gestión de pagos y suscripción disponible próximamente.')}
+                                            onClick={() => handleSelectPlan(plan.id)}
                                         >
                                             {t('selectPlan') || 'Elegir Plan'}
                                         </Button>

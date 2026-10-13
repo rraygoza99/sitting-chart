@@ -73,7 +73,12 @@ function EditableList() {
                         notify.success(t('createdWedding', { name: `${partner1Name} & ${partner2Name}` }));
                         return slug;
                     } catch (err) {
-                        notify.error(err?.message || t('failedSaveWedding'));
+                        if (err?.code === 'PLAN_LIMIT_REACHED' || err?.message?.startsWith('PLAN_LIMIT_REACHED')) {
+                            const limit = err.limit || (err.message.split(':')[1]) || 8;
+                            notify.error(t('planLimitReached', { limit }));
+                        } else {
+                            notify.error(err?.message || t('failedSaveWedding'));
+                        }
                         throw err; // preserve form's submitting state logic
                     }
                 }}

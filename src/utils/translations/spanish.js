@@ -295,8 +295,25 @@ export const spanishTranslations = {
     'restoreBackup': 'Restaurar',
     'backupRestored': 'Copia de seguridad restaurada correctamente.',
     'backupRestoredWarning': 'Asegúrate de guardar el arreglo si deseas conservar la versión restaurada como actual.',
+    'planLimitReached': 'Has alcanzado el límite máximo de {limit} bodas activas para tu plan de suscripción. Actualiza tu plan en Cuenta y Suscripción para agregar más.',
     'failedSaveWedding': 'No se pudo guardar la boda. Inténtalo de nuevo.',
     'table_capatain': 'Capitán de mesa',
+
+    // Help & Support
+    'help': 'Ayuda y Soporte',
+    'helpAndSupport': 'Ayuda y Soporte',
+    'helpCenterTitle': 'Reportar un Error o Consulta',
+    'helpCenterSubtitle': 'Envía tus comentarios, reporte de problemas o dudas directamente a nuestro equipo.',
+    'helpFormSentSuccess': 'Se ha preparado tu mensaje. Si no se abrió tu cliente de correo, puedes enviar tu reporte directamente a rraygoza1408@gmail.com.',
+    'inquiryCategory': 'Tipo de consulta',
+    'categoryBug': 'Reportar un error / Bug',
+    'categoryInquiry': 'Pregunta o consulta general',
+    'categoryFeature': 'Sugerencia de nueva función',
+    'inquirySubject': 'Asunto',
+    'inquirySubjectPlaceholder': 'Breve descripción del problema o consulta',
+    'inquiryMessage': 'Mensaje detallado',
+    'inquiryMessagePlaceholder': 'Cuéntanos con detalle qué ocurrió o en qué te podemos ayudar...',
+    'sendInquiry': 'Enviar Reporte',
 };
 
 export default spanishTranslations;

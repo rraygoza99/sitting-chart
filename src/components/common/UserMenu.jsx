@@ -13,6 +13,7 @@ import Tooltip from '@mui/material/Tooltip';
 
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 import { useSeatingTranslation } from '../../hooks/useSeatingTranslation';
@@ -42,6 +43,11 @@ export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }
     const handleOpenAccount = () => {
         handleMenuClose();
         navigate('/account');
+    };
+
+    const handleOpenHelp = () => {
+        handleMenuClose();
+        navigate('/help');
     };
 
     const handleSettingsClick = () => {
@@ -147,6 +153,13 @@ export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }
                         <ListItemText>{t('settings') || 'Settings'}</ListItemText>
                     </MenuItem>
                 )}
+
+                <MenuItem onClick={handleOpenHelp}>
+                    <ListItemIcon>
+                        <HelpOutlineIcon fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>{t('help') || 'Help & Support'}</ListItemText>
+                </MenuItem>
 
                 <Divider />
 

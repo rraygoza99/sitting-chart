@@ -295,8 +295,25 @@ export const englishTranslations = {
     'restoreBackup': 'Restore',
     'backupRestored': 'Backup restored successfully.',
     'backupRestoredWarning': 'Make sure to save your arrangement if you want to keep the restored backup as the current version.',
+    'planLimitReached': 'You have reached the maximum limit of {limit} active weddings for your subscription plan. Upgrade your plan under Account & Subscription to add more.',
     'failedSaveWedding': 'Failed to save wedding. Please try again.',
     'table_capatain': 'Table captain',
+
+    // Help & Support
+    'help': 'Help & Support',
+    'helpAndSupport': 'Help & Support',
+    'helpCenterTitle': 'Report a Bug or Inquiry',
+    'helpCenterSubtitle': 'Send your feedback, bug report, or questions directly to our team.',
+    'helpFormSentSuccess': 'Your message has been prepared. If your email client did not open automatically, you can send your inquiry directly to rraygoza1408@gmail.com.',
+    'inquiryCategory': 'Inquiry Type',
+    'categoryBug': 'Report a bug / Error',
+    'categoryInquiry': 'General inquiry / Question',
+    'categoryFeature': 'Feature request',
+    'inquirySubject': 'Subject',
+    'inquirySubjectPlaceholder': 'Brief summary of the issue or inquiry',
+    'inquiryMessage': 'Detailed Message',
+    'inquiryMessagePlaceholder': 'Please describe what happened or what you need assistance with...',
+    'sendInquiry': 'Send Report',
 };
 
 export default englishTranslations;

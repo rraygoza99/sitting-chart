@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { listWeddings, createWeddingWithDetails, deleteWedding } from "../utils/weddingsService";
 import { slugify } from "../utils/slug";
+import { canCreateWedding } from "../utils/subscriptionService";
 
 // LocalStorage keys used for backup/fallback
 const LS_WEDDING_ITEMS = "weddingItems";
@@ -54,6 +55,15 @@ export function useWeddings({ ownerMail } = {}) {
 
   const addWedding = useCallback(
     async ({ partner1Name, partner2Name, weddingDate, venue }) => {
+      // Check subscription plan limits
+      const check = canCreateWedding(items.length);
+      if (!check.allowed) {
+        const error = new Error(`PLAN_LIMIT_REACHED:${check.limit}`);
+        error.code = 'PLAN_LIMIT_REACHED';
+        error.limit = check.limit;
+        throw error;
+      }
+
       // Client-side duplicate guard: predict the slug the server will produce
       const dateStr = String(weddingDate).slice(0, 10);
       const expectedSlug = `${toSlug(partner1Name)}-${toSlug(partner2Name)}-${dateStr}`;
