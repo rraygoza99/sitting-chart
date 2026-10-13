@@ -12,6 +12,8 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import CSVImporter from './CSVImporter';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import { S3_API_BASE } from '../config/api';
+import { listWeddingBackups } from '../utils/backupService';
+import { getWedding } from '../utils/weddingsService';
 
 const ConfigurationModal = ({ 
     onExportToJSON, 
@@ -19,6 +21,7 @@ const ConfigurationModal = ({
     onCSVImport,
     onDownloadSampleCSV,
     onLanguageChange,
+    onRestoreBackup,
     weddingId,
     existingGuests = [],
     existingTables = [],
@@ -30,12 +33,25 @@ const ConfigurationModal = ({
     const [internalOpen, setInternalOpen] = useState(false);
     const [defaultTableSize, setDefaultTableSize] = useState(10);
     const [language, setLanguage] = useState('english'); // 'english' or 'spanish'
+    const [backups, setBackups] = useState([]);
+    const [loadingBackups, setLoadingBackups] = useState(false);
     
     // Controlled or uncontrolled open state
     const open = isOpen !== undefined ? isOpen : internalOpen;
     
     // Use translation hook
     const { t } = useSeatingTranslation(currentLanguage);
+
+    // Load backups when modal opens
+    useEffect(() => {
+        if (open && weddingId) {
+            setLoadingBackups(true);
+            listWeddingBackups(weddingId)
+                .then(data => setBackups(data))
+                .catch(err => console.error('Error fetching backups:', err))
+                .finally(() => setLoadingBackups(false));
+        }
+    }, [open, weddingId]);
 
     // Load saved configuration on component mount
     useEffect(() => {
@@ -290,6 +306,69 @@ const ConfigurationModal = ({
                             {t('csvFormatHelp')}
                         </Typography>
                     </Box>
+
+                    {/* Backups Section */}
+                    {weddingId && (
+                        <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" sx={{ mb: 1 }}>
+                                🕒 {t('weddingBackups')}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                {t('backupPolicyDesc')}
+                            </Typography>
+                            {loadingBackups ? (
+                                <Typography variant="body2" color="text.secondary">
+                                    {t('loading')}
+                                </Typography>
+                            ) : backups.length === 0 ? (
+                                <Typography variant="body2" color="text.secondary">
+                                    {t('noBackupsYet')}
+                                </Typography>
+                            ) : (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    {backups.map((b) => (
+                                        <Box
+                                            key={b.backupKey}
+                                            sx={{
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                p: 1.5,
+                                                bgcolor: '#f5f7fa',
+                                                borderRadius: 1,
+                                                border: '1px solid #e0e0e0',
+                                            }}
+                                        >
+                                            <div>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    {b.dateStr}
+                                                </Typography>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {b.isoDate ? new Date(b.isoDate).toLocaleTimeString() : ''}
+                                                </Typography>
+                                            </div>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                color="primary"
+                                                onClick={async () => {
+                                                    if (onRestoreBackup) {
+                                                        const backupData = await getWedding(b.backupKey);
+                                                        if (backupData) {
+                                                            onRestoreBackup(backupData);
+                                                            handleClose();
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                {t('restoreBackup')}
+                                            </Button>
+                                        </Box>
+                                    ))}
+                                </Box>
+                            )}
+                        </Box>
+                    )}
 
                     {/* Arrangement Actions */}
                     <Box sx={{ mb: 3 }}>

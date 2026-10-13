@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from 'react-oidc-context';
+import { useNavigate } from 'react-router-dom';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
@@ -7,15 +8,9 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
-import Dialog from '@mui/material/Dialog';
-import DialogTitle from '@mui/material/DialogTitle';
-import DialogContent from '@mui/material/DialogContent';
-import DialogActions from '@mui/material/DialogActions';
-import Button from '@mui/material/Button';
 import Avatar from '@mui/material/Avatar';
 import Tooltip from '@mui/material/Tooltip';
 
-import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import LogoutIcon from '@mui/icons-material/Logout';
@@ -28,9 +23,9 @@ const cognitoDomain = 'https://sitting-chart.auth.us-east-2.amazoncognito.com';
 
 export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }) {
     const auth = useAuth();
+    const navigate = useNavigate();
     const { t } = useSeatingTranslation(currentLanguage);
     const [anchorEl, setAnchorEl] = useState(null);
-    const [accountModalOpen, setAccountModalOpen] = useState(false);
     const open = Boolean(anchorEl);
 
     const email = auth.user?.profile?.email || '';
@@ -46,11 +41,7 @@ export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }
 
     const handleOpenAccount = () => {
         handleMenuClose();
-        setAccountModalOpen(true);
-    };
-
-    const handleCloseAccount = () => {
-        setAccountModalOpen(false);
+        navigate('/account');
     };
 
     const handleSettingsClick = () => {
@@ -60,14 +51,16 @@ export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }
         }
     };
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         handleMenuClose();
         try {
-            auth.removeUser();
+            await auth.removeUser();
         } catch (e) {
             console.error('Error removing user:', e);
         }
-        window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+        sessionStorage.clear();
+        localStorage.removeItem('oidc.user:' + auth.settings?.authority + ':' + auth.settings?.client_id);
+        window.location.href = '/login';
     };
 
     const userInitial = (username || email || 'U').charAt(0).toUpperCase();
@@ -164,39 +157,6 @@ export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }
                     <ListItemText>{t('logout') || 'Log out'}</ListItemText>
                 </MenuItem>
             </Menu>
-
-            {/* Account Details Dialog */}
-            <Dialog open={accountModalOpen} onClose={handleCloseAccount} maxWidth="xs" fullWidth>
-                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AccountCircleIcon color="primary" />
-                    {t('accountDetails') || 'Account Details'}
-                </DialogTitle>
-                <DialogContent dividers>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <div>
-                            <Typography variant="caption" color="textSecondary">
-                                {t('username') || 'Username'}
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                {username}
-                            </Typography>
-                        </div>
-                        <div>
-                            <Typography variant="caption" color="textSecondary">
-                                {t('email') || 'Email'}
-                            </Typography>
-                            <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                                {email || 'N/A'}
-                            </Typography>
-                        </div>
-                    </div>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseAccount} color="primary" variant="contained" size="small">
-                        {t('close') || 'Close'}
-                    </Button>
-                </DialogActions>
-            </Dialog>
         </>
     );
 }

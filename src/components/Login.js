@@ -9,8 +9,14 @@ const cognitoDomain = "https://sitting-chart.auth.us-east-2.amazoncognito.com";
 const Login = () => {
   const auth = useAuth();
 
-  const signOutRedirect = () => {
-    window.location.href = `${cognitoDomain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(logoutUri)}`;
+  const signOutRedirect = async () => {
+    try {
+      await auth.removeUser();
+    } catch (e) {
+      console.error('Error removing user:', e);
+    }
+    sessionStorage.clear();
+    window.location.href = "/login";
   };
 
   if (auth.isLoading) {

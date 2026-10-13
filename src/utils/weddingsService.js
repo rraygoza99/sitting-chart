@@ -15,7 +15,10 @@ export async function listWeddings(ownerMail) {
   const data = await response.json();
 
   // Keep parity with existing behavior: filter .json files and owner metadata if present
-  let filtered = (data || []).filter((fileObj) => fileObj.fileName && fileObj.fileName.endsWith(".json"));
+  // Also filter out backup files from the main weddings list
+  let filtered = (data || []).filter(
+    (fileObj) => fileObj.fileName && fileObj.fileName.endsWith(".json") && !fileObj.fileName.includes("_backup_")
+  );
 
   if (ownerMail && filtered.some((f) => f.owner || f["x-amz-meta-owner"])) {
     filtered = filtered.filter(

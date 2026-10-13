@@ -5,6 +5,7 @@ import './App.css';
 import SeatingCanvas from './components/SeatingCanvas';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
+import AccountPage from './components/AccountPage';
 import { NotificationProvider } from './components/common/NotificationProvider';
 
 const router = createBrowserRouter([
@@ -17,6 +18,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <EditableList />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/account',
+    element: (
+      <ProtectedRoute>
+        <AccountPage />
       </ProtectedRoute>
     ),
   },

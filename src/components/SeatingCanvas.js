@@ -33,6 +33,7 @@ import './SeatingCanvas.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import { useNotification } from './common/NotificationProvider';
 import { getWedding, saveWedding } from '../utils/weddingsService';
+import { handleWeeklyBackup } from '../utils/backupService';
 import { addGuestsUnique, dedupeGuests, normalizeGuestData, generateUniqueGuestId } from '../utils/guests';
 import { logSeating, findDuplicatesById, summarizeIds } from '../utils/debug';
 
@@ -191,6 +192,12 @@ function SeatingCanvas({ guests = [] }) {
         try {
             const ownerId = auth?.user?.profile?.email || undefined;
             await saveWedding(weddingName, weddingData, ownerId);
+
+            // Execute automatic weekly backup (keeps up to 2 backups per wedding)
+            handleWeeklyBackup(weddingName, weddingData, ownerId).catch((err) => {
+                console.warn('Background backup check failed:', err);
+            });
+
             return true;
         } catch (e) {
             console.error('Error saving wedding to server:', e);
@@ -2047,6 +2054,19 @@ const saveArrangement = async () => {
                         onCSVImport={handleCSVImport}
                         onDownloadSampleCSV={downloadSampleCSV}
                         onLanguageChange={handleLanguageChange}
+                        onRestoreBackup={(backupData) => {
+                            const contentData = backupData.content || backupData;
+                            const restoredGuests = contentData.guestList || contentData.savedGuestList || [];
+                            const restoredTables = contentData.tables || contentData.savedTables || [];
+                            setGuestList(restoredGuests);
+                            setTables(restoredTables);
+                            setTableAliases(contentData.tableAliases || {});
+                            setTableSizes(contentData.tableSizes || {});
+                            setTableNumbers(contentData.tableNumbers || {});
+                            if (contentData.customGroups) setCustomGroups(contentData.customGroups);
+                            setHasUnsavedChanges(true);
+                            notify.info(t('backupRestoredWarning'));
+                        }}
                         currentLanguage={currentLanguage}
                         weddingId={weddingId}
                         existingGuests={guestList}
