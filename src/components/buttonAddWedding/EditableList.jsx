@@ -28,7 +28,7 @@ function EditableList() {
         anyBusy,
         addWedding,
         deleteWedding
-    } = useWeddings({ ownerMail: auth.user?.profile?.email || undefined });
+    } = useWeddings({ ownerEmail: auth.user?.profile?.email || undefined });
     const navigate = useNavigate();
     const [confirm, setConfirm] = useState({ open: false, name: null });
     const notify = useNotification();

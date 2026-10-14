@@ -7,7 +7,8 @@ import { canCreateWedding } from "../utils/subscriptionService";
 const LS_WEDDING_ITEMS = "weddingItems";
 const arrangementKey = (name) => `weddingArrangement-${name}`;
 
-export function useWeddings({ ownerMail } = {}) {
+export function useWeddings({ ownerEmail, ownerMail } = {}) {
+  const effectiveEmail = ownerEmail || ownerMail;
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -35,7 +36,7 @@ export function useWeddings({ ownerMail } = {}) {
     setLoading(true);
     setLoadError(null);
     try {
-      const names = await listWeddings(ownerMail);
+      const names = await listWeddings(effectiveEmail);
       setItems(names || []);
       writeBackup(names || []);
     } catch (err) {
@@ -45,7 +46,7 @@ export function useWeddings({ ownerMail } = {}) {
     } finally {
       setLoading(false);
     }
-  }, [ownerMail, readBackup, writeBackup]);
+  }, [effectiveEmail, readBackup, writeBackup]);
 
   useEffect(() => {
     reload();
@@ -72,7 +73,7 @@ export function useWeddings({ ownerMail } = {}) {
       }
       setSaving(true);
       try {
-        const slug = await createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }, ownerMail);
+        const slug = await createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }, effectiveEmail);
         const next = [...items, slug];
         setItems(next);
         writeBackup(next);
@@ -81,14 +82,14 @@ export function useWeddings({ ownerMail } = {}) {
         setSaving(false);
       }
     },
-    [items, ownerMail, toSlug, writeBackup]
+    [effectiveEmail, items, toSlug, writeBackup]
   );
 
   const removeWedding = useCallback(
     async (name) => {
       setDeletingName(name);
       try {
-        await deleteWedding(name, ownerMail);
+        await deleteWedding(name, effectiveEmail);
         const next = items.filter((n) => n !== name);
         setItems(next);
         writeBackup(next);
@@ -100,7 +101,7 @@ export function useWeddings({ ownerMail } = {}) {
         setDeletingName(null);
       }
     },
-    [items, ownerMail, writeBackup]
+    [effectiveEmail, items, writeBackup]
   );
 
   const anyBusy = useMemo(() => loading || saving || !!deletingName, [loading, saving, deletingName]);

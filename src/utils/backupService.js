@@ -14,16 +14,21 @@ const MAX_BACKUPS = 2;
 /**
  * List all available backups for a given wedding.
  * @param {string} weddingName
- * @param {string} [ownerMail]
+ * @param {string} [ownerEmail]
  * @returns {Promise<Array<{ backupKey: string, timestamp: number, dateStr: string }>>}
  */
-export async function listWeddingBackups(weddingName, ownerMail) {
+export async function listWeddingBackups(weddingName, ownerEmail) {
   try {
-    const listUrl = ownerMail
-      ? `${S3_API_BASE}/list?ownerMail=${encodeURIComponent(ownerMail)}`
+    const listUrl = ownerEmail
+      ? `${S3_API_BASE}/list?ownerEmail=${encodeURIComponent(ownerEmail)}`
       : `${S3_API_BASE}/list`;
 
-    const response = await fetch(listUrl);
+    const headers = {};
+    if (ownerEmail) {
+      headers["X-OwnerEmail"] = ownerEmail;
+    }
+
+    const response = await fetch(listUrl, { headers });
     if (!response.ok) {
       return [];
     }
@@ -56,12 +61,12 @@ export async function listWeddingBackups(weddingName, ownerMail) {
  * Check if a weekly backup is needed, and if so, perform the backup and prune old ones.
  * @param {string} weddingName
  * @param {object} weddingData
- * @param {string} [ownerMail]
+ * @param {string} [ownerEmail]
  * @returns {Promise<{ created: boolean, backupKey?: string }>}
  */
-export async function handleWeeklyBackup(weddingName, weddingData, ownerMail) {
+export async function handleWeeklyBackup(weddingName, weddingData, ownerEmail) {
   try {
-    const existingBackups = await listWeddingBackups(weddingName, ownerMail);
+    const existingBackups = await listWeddingBackups(weddingName, ownerEmail);
     const now = Date.now();
 
     // Check if the newest backup is less than a week old
@@ -84,7 +89,7 @@ export async function handleWeeklyBackup(weddingName, weddingData, ownerMail) {
       backupDate: new Date(now).toISOString(),
     };
 
-    await createWedding(newBackupKey, backupPayload, ownerMail);
+    await createWedding(newBackupKey, backupPayload, ownerEmail);
 
     // Prune old backups if count exceeds MAX_BACKUPS (keep up to 2)
     const updatedBackups = [
@@ -96,7 +101,7 @@ export async function handleWeeklyBackup(weddingName, weddingData, ownerMail) {
       const toDelete = updatedBackups.slice(MAX_BACKUPS);
       for (const item of toDelete) {
         try {
-          await deleteWedding(item.backupKey, ownerMail);
+          await deleteWedding(item.backupKey, ownerEmail);
         } catch (delErr) {
           console.warn(`Failed to prune old backup ${item.backupKey}:`, delErr);
         }

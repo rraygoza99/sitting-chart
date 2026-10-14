@@ -11,11 +11,9 @@ import CloseIcon from '@mui/icons-material/Close';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CSVImporter from './CSVImporter';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
-import { S3_API_BASE } from '../config/api';
 import { listWeddingBackups } from '../utils/backupService';
 import { getWedding } from '../utils/weddingsService';
-import { getPlannerBranding, savePlannerBranding } from '../utils/brandingService';
-import { registerClientUser, isClientUser } from '../utils/userRoleService';
+import { isClientUser } from '../utils/userRoleService';
 import { useAuth } from 'react-oidc-context';
 
 const ConfigurationModal = ({ 
@@ -25,7 +23,6 @@ const ConfigurationModal = ({
     onDownloadSampleCSV,
     onLanguageChange,
     onRestoreBackup,
-    onBrandingChange,
     weddingId,
     existingGuests = [],
     existingTables = [],
@@ -39,11 +36,6 @@ const ConfigurationModal = ({
     const [language, setLanguage] = useState('english'); // 'english' or 'spanish'
     const [backups, setBackups] = useState([]);
     const [loadingBackups, setLoadingBackups] = useState(false);
-    
-    // Planner Branding State
-    const [companyName, setCompanyName] = useState('');
-    const [tagline, setTagline] = useState('');
-    const [logoDataUrl, setLogoDataUrl] = useState('');
 
     const auth = useAuth();
     const isClient = isClientUser(auth.user?.profile);
@@ -58,14 +50,15 @@ const ConfigurationModal = ({
     useEffect(() => {
         if (open && weddingId) {
             setLoadingBackups(true);
-            listWeddingBackups(weddingId)
+            const userEmail = auth.user?.profile?.email || undefined;
+            listWeddingBackups(weddingId, userEmail)
                 .then(data => setBackups(data))
                 .catch(err => console.error('Error fetching backups:', err))
                 .finally(() => setLoadingBackups(false));
         }
-    }, [open, weddingId]);
+    }, [open, weddingId, auth.user?.profile?.email]);
 
-    // Load saved configuration and branding on component mount
+    // Load saved configuration on component mount
     useEffect(() => {
         const savedConfig = localStorage.getItem('seatingConfiguration');
         if (savedConfig) {
@@ -76,13 +69,6 @@ const ConfigurationModal = ({
             } catch (error) {
                 console.error('Error loading configuration:', error);
             }
-        }
-
-        const branding = getPlannerBranding();
-        if (branding) {
-            setCompanyName(branding.companyName || '');
-            setTagline(branding.tagline || '');
-            setLogoDataUrl(branding.logoDataUrl || '');
         }
     }, [open]);
 
@@ -96,27 +82,6 @@ const ConfigurationModal = ({
         else setInternalOpen(false);
     };
 
-    const handleLogoUpload = (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        // Ensure reasonable image size (max 1.5MB)
-        if (file.size > 1.5 * 1024 * 1024) {
-            alert('Image size exceeds 1.5MB. Please choose a smaller image.');
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onload = (uploadEvent) => {
-            setLogoDataUrl(uploadEvent.target.result);
-        };
-        reader.readAsDataURL(file);
-    };
-
-    const handleRemoveLogo = () => {
-        setLogoDataUrl('');
-    };
-
     const handleSave = () => {
         // Save the configuration to localStorage
         const config = {
@@ -124,18 +89,6 @@ const ConfigurationModal = ({
             language: language
         };
         localStorage.setItem('seatingConfiguration', JSON.stringify(config));
-
-        // Save branding to localStorage
-        const newBranding = {
-            companyName: companyName.trim(),
-            tagline: tagline.trim(),
-            logoDataUrl: logoDataUrl,
-        };
-        savePlannerBranding(newBranding);
-
-        if (onBrandingChange) {
-            onBrandingChange(newBranding);
-        }
         
         // Notify parent component of language change
         if (onLanguageChange) {
@@ -143,46 +96,6 @@ const ConfigurationModal = ({
         }
         
         handleClose();
-    };
-
-    // Share (add user) state and handler
-    const [newEmail, setNewEmail] = useState('');
-    const [clientLabel, setClientLabel] = useState('');
-    const [shareLoading, setShareLoading] = useState(false);
-
-    const handleShare = async () => {
-        if (!weddingId) {
-            alert('No file selected to share.');
-            return;
-        }
-        const email = newEmail.trim();
-        if (!email) {
-            alert('Please enter a valid email address.');
-            return;
-        }
-
-        setShareLoading(true);
-        try {
-            const fileName = `${weddingId}.json`;
-            const shareUrl = `${S3_API_BASE}/share/${encodeURIComponent(fileName)}?newEmail=${encodeURIComponent(email)}`;
-            const response = await fetch(shareUrl, { method: 'POST' });
-            if (!response.ok) {
-                const text = await response.text().catch(() => '');
-                throw new Error(text || `HTTP ${response.status}`);
-            }
-
-            // Register as Bride/Groom client role for this wedding
-            registerClientUser(email, weddingId, clientLabel || 'Bride/Groom');
-
-            alert(`Successfully granted Bride/Groom access for ${weddingId} to ${email}`);
-            setNewEmail('');
-            setClientLabel('');
-        } catch (err) {
-            console.error('Error sharing file:', err);
-            alert('Failed to share file. ' + (err.message || ''));
-        } finally {
-            setShareLoading(false);
-        }
     };
 
     const handleTableSizeChange = (event) => {
@@ -257,134 +170,10 @@ const ConfigurationModal = ({
                             <CloseIcon />
                         </IconButton>
                     </Box>
-
-                    {/* Add Bride/Groom client user / Share section */}
-                    <Box sx={{ mb: 3 }}>
-                        <Typography variant="h6" sx={{ mb: 1 }}>
-                            👥 {t('shareWithCouple') || 'Add Client (The Bride/Groom)'}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            {t('shareWithCoupleDesc') || 'Grant your clients (the bride/groom) access to view and modify only this seating chart. Client accounts can only edit their assigned wedding and cannot access billing or global settings.'}
-                        </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <TextField
-                                    placeholder={t('clientEmailPlaceholder') || 'client@email.com'}
-                                    value={newEmail}
-                                    onChange={(e) => setNewEmail(e.target.value)}
-                                    size="small"
-                                    sx={{ flex: 1, minWidth: 200 }}
-                                />
-                                <TextField
-                                    placeholder={t('clientNamePlaceholder') || 'e.g. Maria & Juan'}
-                                    value={clientLabel}
-                                    onChange={(e) => setClientLabel(e.target.value)}
-                                    size="small"
-                                    sx={{ width: 180 }}
-                                />
-                                <Button
-                                    variant="contained"
-                                    onClick={handleShare}
-                                    disabled={shareLoading || !newEmail.trim() || !weddingId}
-                                    sx={{ textTransform: 'none' }}
-                                >
-                                    {shareLoading ? (t('saving') || 'Adding...') : (t('grantAccess') || 'Grant Access')}
-                                </Button>
-                            </Box>
-                        </Box>
-                    </Box>
                     
                     <Typography variant="body1" sx={{ mb: 3 }}>
                         {t('configureSeatingSettings')}
                     </Typography>
-
-                    {/* Planner Branding Settings */}
-                    <Box sx={{ mb: 3 }}>
-                        <Typography variant="h6" sx={{ mb: 1 }}>
-                            🎨 {t('plannerBranding') || 'Planner Branding'}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            {t('plannerBrandingDesc') || 'Customize your logo, company name and tagline. This branding will appear on exported PDFs and your seating canvas.'}
-                        </Typography>
-
-                        <TextField
-                            fullWidth
-                            label={t('brandingCompanyName') || 'Company / Planner Name'}
-                            value={companyName}
-                            onChange={(e) => setCompanyName(e.target.value)}
-                            placeholder={t('brandingCompanyNamePlaceholder') || 'e.g. Elegance Weddings & Events'}
-                            variant="outlined"
-                            sx={{ mb: 2 }}
-                        />
-
-                        <TextField
-                            fullWidth
-                            label={t('brandingTagline') || 'Tagline / Contact Phone / Website'}
-                            value={tagline}
-                            onChange={(e) => setTagline(e.target.value)}
-                            placeholder={t('brandingTaglinePlaceholder') || 'e.g. www.eleganceweddings.mx | +52 55 1234 5678'}
-                            variant="outlined"
-                            sx={{ mb: 2 }}
-                        />
-
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 2, bgcolor: '#fbfcfe', border: '1px dashed #bbb', borderRadius: 1.5 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                    {t('brandingLogo') || 'Planner Logo'}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
-                                    {t('brandingLogoDimensions') || '300 × 120 px (PNG)'}
-                                </Typography>
-                            </Box>
-                            {logoDataUrl ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                    <Box
-                                        component="img"
-                                        src={logoDataUrl}
-                                        alt="Planner Logo"
-                                        sx={{
-                                            maxHeight: 60,
-                                            maxWidth: 160,
-                                            objectFit: 'contain',
-                                            bgcolor: '#fff',
-                                            p: 0.5,
-                                            border: '1px solid #ddd',
-                                            borderRadius: 1,
-                                        }}
-                                    />
-                                    <Button
-                                        variant="outlined"
-                                        color="error"
-                                        size="small"
-                                        onClick={handleRemoveLogo}
-                                    >
-                                        {t('removeLogo') || 'Remove Logo'}
-                                    </Button>
-                                </Box>
-                            ) : (
-                                <Typography variant="caption" color="text.secondary">
-                                    {t('noLogoSelected') || 'No logo uploaded yet.'}
-                                </Typography>
-                            )}
-
-                            <div>
-                                <Button
-                                    variant="outlined"
-                                    component="label"
-                                    size="small"
-                                    sx={{ textTransform: 'none' }}
-                                >
-                                    {logoDataUrl ? (t('changeLogo') || 'Change Logo') : (t('uploadLogo') || 'Upload Logo (PNG / JPG)')}
-                                    <input
-                                        type="file"
-                                        hidden
-                                        accept="image/png, image/jpeg, image/webp"
-                                        onChange={handleLogoUpload}
-                                    />
-                                </Button>
-                            </div>
-                        </Box>
-                    </Box>
 
                     {/* Language Settings */}
                     <Box sx={{ mb: 3 }}>
@@ -465,8 +254,8 @@ const ConfigurationModal = ({
                         </Typography>
                     </Box>
 
-                    {/* Backups Section */}
-                    {weddingId && (
+                    {/* Backups Section (Planners only) */}
+                    {!isClient && weddingId && (
                         <Box sx={{ mb: 3 }}>
                             <Typography variant="h6" sx={{ mb: 1 }}>
                                 🕒 {t('weddingBackups')}
@@ -511,7 +300,8 @@ const ConfigurationModal = ({
                                                 color="primary"
                                                 onClick={async () => {
                                                     if (onRestoreBackup) {
-                                                        const backupData = await getWedding(b.backupKey);
+                                                        const userEmail = auth.user?.profile?.email || undefined;
+                                                        const backupData = await getWedding(b.backupKey, userEmail);
                                                         if (backupData) {
                                                             onRestoreBackup(backupData);
                                                             handleClose();
@@ -528,35 +318,37 @@ const ConfigurationModal = ({
                         </Box>
                     )}
 
-                    {/* Arrangement Actions */}
-                    <Box sx={{ mb: 3 }}>
-                        <Typography variant="h6" sx={{ mb: 2 }}>
-                            {t('arrangementActions')}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                            <Button
-                                variant="contained"
-                                color="warning"
-                                onClick={onExportToJSON}
-                                size="medium"
-                                sx={{ minWidth: '150px' }}
-                            >
-                                {t('exportToJSON')}
-                            </Button>
-                            <Button
-                                variant="contained"
-                                color="error"
-                                onClick={onDeleteArrangement}
-                                size="medium"
-                                sx={{ minWidth: '150px' }}
-                            >
-                                {t('delete')} {t('arrangement')}
-                            </Button>
+                    {/* Arrangement Actions (Planners only) */}
+                    {!isClient && (
+                        <Box sx={{ mb: 3 }}>
+                            <Typography variant="h6" sx={{ mb: 2 }}>
+                                {t('arrangementActions')}
+                            </Typography>
+                            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                                <Button
+                                    variant="contained"
+                                    color="warning"
+                                    onClick={onExportToJSON}
+                                    size="medium"
+                                    sx={{ minWidth: '150px' }}
+                                >
+                                    {t('exportToJSON')}
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    color="error"
+                                    onClick={onDeleteArrangement}
+                                    size="medium"
+                                    sx={{ minWidth: '150px' }}
+                                >
+                                    {t('delete')} {t('arrangement')}
+                                </Button>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                {weddingId ? t('currentArrangement', { name: weddingId }) : t('noArrangementSelected')}
+                            </Typography>
                         </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            {weddingId ? t('currentArrangement', { name: weddingId }) : t('noArrangementSelected')}
-                        </Typography>
-                    </Box>
+                    )}
 
                     <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
                         <Button

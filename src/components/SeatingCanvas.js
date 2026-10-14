@@ -182,7 +182,8 @@ function SeatingCanvas({ guests = [] }) {
     const loadWeddingFromServer = async (weddingName) => {
         setIsLoading(true);
         try {
-            const data = await getWedding(weddingName);
+            const ownerId = auth?.user?.profile?.email || undefined;
+            const data = await getWedding(weddingName, ownerId);
             return data;
         } catch (e) {
             console.error('Error loading wedding from server:', e);
@@ -380,7 +381,7 @@ function SeatingCanvas({ guests = [] }) {
             setGuestList(initialGuestList);
         }
         
-        // Load language preference
+        // Load language preference and branding
         const savedConfig = localStorage.getItem('seatingConfiguration');
         if (savedConfig) {
             try {
@@ -392,6 +393,7 @@ function SeatingCanvas({ guests = [] }) {
                 console.error('Error loading language preference:', error);
             }
         }
+        setPlannerBranding(getPlannerBranding());
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -2144,7 +2146,6 @@ const saveArrangement = async (isAutoSave = false) => {
                         onCSVImport={handleCSVImport}
                         onDownloadSampleCSV={downloadSampleCSV}
                         onLanguageChange={handleLanguageChange}
-                        onBrandingChange={(newBranding) => setPlannerBranding(newBranding)}
                         onRestoreBackup={(backupData) => {
                             const contentData = backupData.content || backupData;
                             const restoredGuests = contentData.guestList || contentData.savedGuestList || [];

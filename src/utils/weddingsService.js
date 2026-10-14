@@ -1,29 +1,41 @@
 import { S3_API_BASE, WEDDINGS_API_BASE } from "../config/api";
 import { slugify } from "./slug";
 
-// List weddings from the server, optionally filtered by ownerMail if backend supports it.
+// List weddings from the server, optionally filtered by ownerEmail if backend supports it.
 // Returns an array of wedding names (strings) without the .json extension.
-export async function listWeddings(ownerMail) {
-  const listUrl = ownerMail
-    ? `${S3_API_BASE}/list?ownerMail=${encodeURIComponent(ownerMail)}`
+export async function listWeddings(ownerEmail) {
+  const listUrl = ownerEmail
+    ? `${S3_API_BASE}/list?ownerEmail=${encodeURIComponent(ownerEmail)}`
     : `${S3_API_BASE}/list`;
 
-  const response = await fetch(listUrl);
+  const headers = {};
+  if (ownerEmail) {
+    headers["X-OwnerEmail"] = ownerEmail;
+  }
+
+  const response = await fetch(listUrl, { headers });
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
   const data = await response.json();
 
-  // Keep parity with existing behavior: filter .json files and owner metadata if present
-  // Also filter out backup files from the main weddings list
+  // Filter .json files and exclude backup files from main list
   let filtered = (data || []).filter(
     (fileObj) => fileObj.fileName && fileObj.fileName.endsWith(".json") && !fileObj.fileName.includes("_backup_")
   );
 
-  if (ownerMail && filtered.some((f) => f.owner || f["x-amz-meta-owner"])) {
-    filtered = filtered.filter(
-      (f) => f.owner === ownerMail || f["x-amz-meta-owner"] === ownerMail
-    );
+  if (ownerEmail) {
+    const targetEmail = ownerEmail.toLowerCase().trim();
+    filtered = filtered.filter((f) => {
+      if (Array.isArray(f.ownerEmails) && f.ownerEmails.length > 0) {
+        return f.ownerEmails.some((e) => (e || "").toLowerCase().trim() === targetEmail);
+      }
+      if (f.owner || f["x-amz-meta-owner"] || f["X-OwnerEmail"] || f["x-owneremail"]) {
+        const ownerVal = (f.owner || f["x-amz-meta-owner"] || f["X-OwnerEmail"] || f["x-owneremail"] || "").toLowerCase();
+        return ownerVal.includes(targetEmail);
+      }
+      return true;
+    });
   }
 
   const weddingNames = filtered.map((fileObj) => fileObj.fileName.replace(".json", ""));
@@ -31,20 +43,25 @@ export async function listWeddings(ownerMail) {
 }
 
 // Create/Upload a wedding JSON to server
-export async function createWedding(weddingName, weddingData, ownerMail) {
+export async function createWedding(weddingName, weddingData, ownerEmail) {
   const jsonBlob = new Blob([JSON.stringify(weddingData)], { type: "application/json" });
   const formData = new FormData();
   formData.append("file", jsonBlob, `${weddingName}.json`);
   formData.append("fileName", `${weddingName}.json`);
 
-  if (ownerMail) {
-    formData.append("owner", ownerMail);
-    formData.append("x-amz-meta-owner", ownerMail);
-    formData.append("metadata", JSON.stringify({ "x-amz-meta-owner": ownerMail }));
+  if (ownerEmail) {
+    formData.append("ownerEmail", ownerEmail);
+    formData.append("X-OwnerEmail", ownerEmail);
+    formData.append("owner", ownerEmail);
+    formData.append("x-amz-meta-owner", ownerEmail);
+    formData.append("metadata", JSON.stringify({ "X-OwnerEmail": ownerEmail, "x-amz-meta-owner": ownerEmail }));
   }
 
   const headers = {};
-  if (ownerMail) headers["ownerMail"] = ownerMail;
+  if (ownerEmail) {
+    headers["X-OwnerEmail"] = ownerEmail;
+    headers["ownerEmail"] = ownerEmail;
+  }
 
   const response = await fetch(`${S3_API_BASE}/upload`, {
     method: "POST",
@@ -58,10 +75,20 @@ export async function createWedding(weddingName, weddingData, ownerMail) {
 }
 
 // Delete a wedding on the server
-export async function deleteWedding(weddingName, ownerMail) {
+export async function deleteWedding(weddingName, ownerEmail) {
   const fileName = encodeURIComponent(`${weddingName}.json`);
-  const response = await fetch(`${S3_API_BASE}/delete/${fileName}`, {
+  const deleteUrl = ownerEmail
+    ? `${S3_API_BASE}/delete/${fileName}?ownerEmail=${encodeURIComponent(ownerEmail)}`
+    : `${S3_API_BASE}/delete/${fileName}`;
+
+  const headers = {};
+  if (ownerEmail) {
+    headers["X-OwnerEmail"] = ownerEmail;
+  }
+
+  const response = await fetch(deleteUrl, {
     method: "DELETE",
+    headers,
   });
 
   if (!response.ok) {
@@ -70,8 +97,18 @@ export async function deleteWedding(weddingName, ownerMail) {
 }
 
 // Fetch a single wedding JSON from the server
-export async function getWedding(weddingName) {
-  const response = await fetch(`${S3_API_BASE}/file/${encodeURIComponent(weddingName)}.json`);
+export async function getWedding(weddingName, ownerEmail) {
+  const fileName = encodeURIComponent(weddingName);
+  const getUrl = ownerEmail
+    ? `${S3_API_BASE}/file/${fileName}.json?ownerEmail=${encodeURIComponent(ownerEmail)}`
+    : `${S3_API_BASE}/file/${fileName}.json`;
+
+  const headers = {};
+  if (ownerEmail) {
+    headers["X-OwnerEmail"] = ownerEmail;
+  }
+
+  const response = await fetch(getUrl, { headers });
   if (!response.ok) {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
@@ -80,16 +117,17 @@ export async function getWedding(weddingName) {
 }
 
 // Save a wedding JSON (alias to create/upload)
-export async function saveWedding(weddingName, weddingData, ownerMail) {
-  return createWedding(weddingName, weddingData, ownerMail);
+export async function saveWedding(weddingName, weddingData, ownerEmail) {
+  return createWedding(weddingName, weddingData, ownerEmail);
 }
 
 /**
  * Create a new wedding via the dedicated REST endpoint (POST /api/weddings).
  * @param {{ partner1Name: string, partner2Name: string, weddingDate: string, venue?: string }} details
+ * @param {string} [ownerEmail]
  * @returns {Promise<string>} The slug/ID of the created wedding (safeName without .json)
  */
-export async function createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }, ownerMail) {
+export async function createWeddingWithDetails({ partner1Name, partner2Name, weddingDate, venue }, ownerEmail) {
   const dateStr = String(weddingDate).slice(0, 10);
   const slug = `${slugify(partner1Name)}-${slugify(partner2Name)}-${dateStr}`;
 
@@ -108,18 +146,24 @@ export async function createWeddingWithDetails({ partner1Name, partner2Name, wed
       tableNumbers: {},
       metadata: { viewMode: "list", isGrouped: true, version: "1.0" },
     };
-    await createWedding(slug, emptyData, ownerMail);
+    await createWedding(slug, emptyData, ownerEmail);
     return slug;
+  }
+
+  const headers = { "Content-Type": "application/json" };
+  if (ownerEmail) {
+    headers["X-OwnerEmail"] = ownerEmail;
   }
 
   const response = await fetch(`${WEDDINGS_API_BASE}/api/weddings`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({
       Partner1Name: partner1Name,
       Partner2Name: partner2Name,
       WeddingDate: weddingDate,
       Venue: venue || "",
+      OwnerEmail: ownerEmail || "",
     }),
   });
   if (!response.ok) {
