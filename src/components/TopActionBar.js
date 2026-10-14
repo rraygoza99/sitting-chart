@@ -24,6 +24,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import './TopActionBar.css';
 import { useSeatingTranslation } from '../hooks/useSeatingTranslation';
 import UserMenu from './common/UserMenu';
+import { isClientUser } from '../utils/userRoleService';
+import { useAuth } from 'react-oidc-context';
 
 function TopActionBar({ 
     onSave, 
@@ -45,6 +47,8 @@ function TopActionBar({
     const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
     const exportAnchorRef = useRef(null);
     const navigate = useNavigate();
+    const auth = useAuth();
+    const isClient = isClientUser(auth.user?.profile);
     
     // Use translation hook
     const { t } = useSeatingTranslation(currentLanguage);
@@ -260,7 +264,7 @@ function TopActionBar({
                         )}
                     </Popper>
 
-                    <UserMenu onOpenSettings={onOpenSettings} currentLanguage={currentLanguage} />
+                    <UserMenu onOpenSettings={isClient ? undefined : onOpenSettings} currentLanguage={currentLanguage} />
                 </div>
             </div>
             

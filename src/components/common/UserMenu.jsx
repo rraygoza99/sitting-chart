@@ -17,6 +17,7 @@ import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LogoutIcon from '@mui/icons-material/Logout';
 
 import { useSeatingTranslation } from '../../hooks/useSeatingTranslation';
+import { isClientUser } from '../../utils/userRoleService';
 
 export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }) {
     const auth = useAuth();
@@ -24,6 +25,8 @@ export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }
     const { t } = useSeatingTranslation(currentLanguage);
     const [anchorEl, setAnchorEl] = useState(null);
     const open = Boolean(anchorEl);
+
+    const isClient = isClientUser(auth.user?.profile);
 
     const email = auth.user?.profile?.email || '';
     const username = auth.user?.profile?.['cognito:username'] || auth.user?.profile?.preferred_username || auth.user?.profile?.username || email || 'User';
@@ -131,33 +134,42 @@ export default function UserMenu({ onOpenSettings, currentLanguage = 'english' }
                             {email}
                         </Typography>
                     )}
+                    {isClient && (
+                        <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600, display: 'block', mt: 0.5 }}>
+                            {t('roleClient') || 'The Bride/Groom'}
+                        </Typography>
+                    )}
                 </div>
                 <Divider />
 
-                <MenuItem onClick={handleOpenAccount}>
-                    <ListItemIcon>
-                        <PersonOutlineIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>{t('account') || 'Account'}</ListItemText>
-                </MenuItem>
+                {!isClient && (
+                    <>
+                        <MenuItem onClick={handleOpenAccount}>
+                            <ListItemIcon>
+                                <PersonOutlineIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText>{t('account') || 'Account'}</ListItemText>
+                        </MenuItem>
 
-                {onOpenSettings && (
-                    <MenuItem onClick={handleSettingsClick}>
-                        <ListItemIcon>
-                            <SettingsOutlinedIcon fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText>{t('settings') || 'Settings'}</ListItemText>
-                    </MenuItem>
+                        {onOpenSettings && (
+                            <MenuItem onClick={handleSettingsClick}>
+                                <ListItemIcon>
+                                    <SettingsOutlinedIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>{t('settings') || 'Settings'}</ListItemText>
+                            </MenuItem>
+                        )}
+
+                        <MenuItem onClick={handleOpenHelp}>
+                            <ListItemIcon>
+                                <HelpOutlineIcon fontSize="small" />
+                            </ListItemIcon>
+                            <ListItemText>{t('help') || 'Help & Support'}</ListItemText>
+                        </MenuItem>
+
+                        <Divider />
+                    </>
                 )}
-
-                <MenuItem onClick={handleOpenHelp}>
-                    <ListItemIcon>
-                        <HelpOutlineIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>{t('help') || 'Help & Support'}</ListItemText>
-                </MenuItem>
-
-                <Divider />
 
                 <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
                     <ListItemIcon sx={{ color: 'error.main' }}>

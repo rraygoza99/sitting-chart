@@ -278,9 +278,14 @@ export default function AccountPage() {
 
                             <Grid item xs={12}>
                                 <Box sx={{ p: 2, bgcolor: '#fbfcfe', border: '1px dashed #bbb', borderRadius: 1.5 }}>
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-                                        {t('brandingLogo') || 'Logotipo'}
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                            {t('brandingLogo') || 'Logotipo'}
+                                        </Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                            {t('brandingLogoDimensions') || 'Recomendado: 300 × 120 px (PNG transparente, formato horizontal, máx. 1.5 MB)'}
+                                        </Typography>
+                                    </Box>
                                     {logoDataUrl ? (
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', mb: 1.5 }}>
                                             <Box

@@ -326,11 +326,20 @@ export const spanishTranslations = {
     'brandingTagline': 'Eslogan / Sitio Web / Teléfono de Contacto',
     'brandingTaglinePlaceholder': 'ej. www.elegancebodas.mx | +52 55 1234 5678',
     'brandingLogo': 'Logotipo',
+    'brandingLogoDimensions': 'Recomendado: 300 × 120 px (PNG transparente, formato horizontal ~2.5:1, máx. 1.5 MB)',
     'uploadLogo': 'Subir Logotipo (PNG / JPG)',
     'changeLogo': 'Cambiar Logotipo',
     'removeLogo': 'Eliminar Logotipo',
     'noLogoSelected': 'Aún no has subido ningún logotipo.',
     'brandingSavedSuccess': '¡Marca guardada con éxito! Se aplicará en tus PDFs exportados y en el espacio de trabajo.',
+
+    // Client Roles & Sharing
+    'roleClient': 'Novio / Novia',
+    'shareWithCouple': 'Agregar Cliente (Novios)',
+    'shareWithCoupleDesc': 'Otorga acceso a tus clientes para ver y modificar únicamente este arreglo de mesas. No podrán ver facturación, configuración global ni otras bodas.',
+    'clientEmailPlaceholder': 'cliente@correo.com',
+    'clientNamePlaceholder': 'ej. María y Juan',
+    'grantAccess': 'Otorgar Acceso',
 };
 
 export default spanishTranslations;

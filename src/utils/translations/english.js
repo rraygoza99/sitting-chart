@@ -326,11 +326,20 @@ export const englishTranslations = {
     'brandingTagline': 'Tagline / Website / Contact Info',
     'brandingTaglinePlaceholder': 'e.g. www.eleganceweddings.mx | +52 55 1234 5678',
     'brandingLogo': 'Planner Logo',
+    'brandingLogoDimensions': 'Recommended: 300 × 120 px (transparent PNG, horizontal format ~2.5:1, max 1.5 MB)',
     'uploadLogo': 'Upload Logo (PNG / JPG)',
     'changeLogo': 'Change Logo',
     'removeLogo': 'Remove Logo',
     'noLogoSelected': 'No logo uploaded yet.',
     'brandingSavedSuccess': 'Branding updated successfully! It will now appear on your exported PDFs and workspace.',
+
+    // Client Roles & Sharing
+    'roleClient': 'The Bride / Groom',
+    'shareWithCouple': 'Add Client (The Bride/Groom)',
+    'shareWithCoupleDesc': 'Grant your clients access to view and edit only this seating arrangement. They cannot access billing, settings, or other weddings.',
+    'clientEmailPlaceholder': 'client@email.com',
+    'clientNamePlaceholder': 'e.g. Maria & Juan',
+    'grantAccess': 'Grant Access',
 };
 
 export default englishTranslations;

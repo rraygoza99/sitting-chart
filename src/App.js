@@ -24,7 +24,7 @@ const router = createBrowserRouter([
   {
     path: '/account',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requirePlanner={true}>
         <AccountPage />
       </ProtectedRoute>
     ),
@@ -32,7 +32,7 @@ const router = createBrowserRouter([
   {
     path: '/help',
     element: (
-      <ProtectedRoute>
+      <ProtectedRoute requirePlanner={true}>
         <HelpPage />
       </ProtectedRoute>
     ),

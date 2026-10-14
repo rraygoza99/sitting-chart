@@ -15,6 +15,8 @@ import { S3_API_BASE } from '../config/api';
 import { listWeddingBackups } from '../utils/backupService';
 import { getWedding } from '../utils/weddingsService';
 import { getPlannerBranding, savePlannerBranding } from '../utils/brandingService';
+import { registerClientUser, isClientUser } from '../utils/userRoleService';
+import { useAuth } from 'react-oidc-context';
 
 const ConfigurationModal = ({ 
     onExportToJSON, 
@@ -42,6 +44,9 @@ const ConfigurationModal = ({
     const [companyName, setCompanyName] = useState('');
     const [tagline, setTagline] = useState('');
     const [logoDataUrl, setLogoDataUrl] = useState('');
+
+    const auth = useAuth();
+    const isClient = isClientUser(auth.user?.profile);
     
     // Controlled or uncontrolled open state
     const open = isOpen !== undefined ? isOpen : internalOpen;
@@ -142,6 +147,7 @@ const ConfigurationModal = ({
 
     // Share (add user) state and handler
     const [newEmail, setNewEmail] = useState('');
+    const [clientLabel, setClientLabel] = useState('');
     const [shareLoading, setShareLoading] = useState(false);
 
     const handleShare = async () => {
@@ -164,8 +170,13 @@ const ConfigurationModal = ({
                 const text = await response.text().catch(() => '');
                 throw new Error(text || `HTTP ${response.status}`);
             }
-            alert(`Successfully shared ${fileName} with ${email}`);
+
+            // Register as Bride/Groom client role for this wedding
+            registerClientUser(email, weddingId, clientLabel || 'Bride/Groom');
+
+            alert(`Successfully granted Bride/Groom access for ${weddingId} to ${email}`);
             setNewEmail('');
+            setClientLabel('');
         } catch (err) {
             console.error('Error sharing file:', err);
             alert('Failed to share file. ' + (err.message || ''));
@@ -219,14 +230,16 @@ const ConfigurationModal = ({
 
     return (
         <>
-            {/* Fixed Configuration Button */}
-            <IconButton
-                onClick={handleOpen}
-                sx={configButtonStyle}
-                title={t('configurationSettings')}
-            >
-                <SettingsIcon fontSize="large" />
-            </IconButton>
+            {/* Fixed Configuration Button - visible only to Planners */}
+            {!isClient && (
+                <IconButton
+                    onClick={handleOpen}
+                    sx={configButtonStyle}
+                    title={t('configurationSettings')}
+                >
+                    <SettingsIcon fontSize="large" />
+                </IconButton>
+            )}
 
             {/* Configuration Modal */}
             <Modal
@@ -245,30 +258,40 @@ const ConfigurationModal = ({
                         </IconButton>
                     </Box>
 
-                    {/* Add user / Share section */}
+                    {/* Add Bride/Groom client user / Share section */}
                     <Box sx={{ mb: 3 }}>
-                        <Typography variant="h6" sx={{ mb: 2 }}>
-                            Add user
+                        <Typography variant="h6" sx={{ mb: 1 }}>
+                            👥 {t('shareWithCouple') || 'Add Client (The Bride/Groom)'}
                         </Typography>
-                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                            <TextField
-                                placeholder="Email..."
-                                value={newEmail}
-                                onChange={(e) => setNewEmail(e.target.value)}
-                                size="small"
-                                sx={{ flex: 1 }}
-                            />
-                            <Button
-                                variant="contained"
-                                onClick={handleShare}
-                                disabled={shareLoading || !newEmail.trim() || !weddingId}
-                            >
-                                {shareLoading ? 'Sharing...' : 'Share'}
-                            </Button>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            {t('shareWithCoupleDesc') || 'Grant your clients (the bride/groom) access to view and modify only this seating chart. Client accounts can only edit their assigned wedding and cannot access billing or global settings.'}
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <TextField
+                                    placeholder={t('clientEmailPlaceholder') || 'client@email.com'}
+                                    value={newEmail}
+                                    onChange={(e) => setNewEmail(e.target.value)}
+                                    size="small"
+                                    sx={{ flex: 1, minWidth: 200 }}
+                                />
+                                <TextField
+                                    placeholder={t('clientNamePlaceholder') || 'e.g. Maria & Juan'}
+                                    value={clientLabel}
+                                    onChange={(e) => setClientLabel(e.target.value)}
+                                    size="small"
+                                    sx={{ width: 180 }}
+                                />
+                                <Button
+                                    variant="contained"
+                                    onClick={handleShare}
+                                    disabled={shareLoading || !newEmail.trim() || !weddingId}
+                                    sx={{ textTransform: 'none' }}
+                                >
+                                    {shareLoading ? (t('saving') || 'Adding...') : (t('grantAccess') || 'Grant Access')}
+                                </Button>
+                            </Box>
                         </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            Enter an email address to grant access to the current arrangement file.
-                        </Typography>
                     </Box>
                     
                     <Typography variant="body1" sx={{ mb: 3 }}>
@@ -305,9 +328,14 @@ const ConfigurationModal = ({
                         />
 
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 2, bgcolor: '#fbfcfe', border: '1px dashed #bbb', borderRadius: 1.5 }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                                {t('brandingLogo') || 'Planner Logo'}
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                    {t('brandingLogo') || 'Planner Logo'}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    {t('brandingLogoDimensions') || '300 × 120 px (PNG)'}
+                                </Typography>
+                            </Box>
                             {logoDataUrl ? (
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                     <Box

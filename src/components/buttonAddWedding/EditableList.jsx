@@ -10,9 +10,13 @@ import ConfirmDeleteDialog from "./ConfirmDeleteDialog";
 import { useState } from 'react';
 import { useSeatingTranslation } from '../../hooks/useSeatingTranslation';
 import { useNotification } from "../common/NotificationProvider";
+import { isClientUser, getClientAssignedWedding } from "../../utils/userRoleService";
 
 function EditableList() {
     const auth = useAuth();
+    const isClient = isClientUser(auth.user?.profile);
+    const assignedWedding = isClient ? getClientAssignedWedding(auth.user?.profile?.email) : null;
+
     const userName = auth.user?.profile?.username || auth.user?.profile?.email || 'User';
     const { t } = useSeatingTranslation();
     const { 
@@ -29,6 +33,18 @@ function EditableList() {
     const [confirm, setConfirm] = useState({ open: false, name: null });
     const notify = useNotification();
     
+    // Automatically redirect client to their assigned wedding if available
+    useEffect(() => {
+        if (isClient && assignedWedding) {
+            navigate(`/wedding/${assignedWedding}`, { replace: true });
+        }
+    }, [isClient, assignedWedding, navigate]);
+
+    // For clients, filter the weddings list to only their assigned wedding
+    const displayItems = isClient && assignedWedding
+        ? items.filter(w => w === assignedWedding)
+        : items;
+
     // Notify user on load fallback
     useEffect(() => {
         if (loadError) {
@@ -65,34 +81,36 @@ function EditableList() {
                     {t('loadingWeddings')}
                 </div>
             )}
-            {/* Create wedding */}
-            <CreateWeddingForm
-                onCreate={async ({ partner1Name, partner2Name, weddingDate, venue }) => {
-                    try {
-                        const slug = await addWedding({ partner1Name, partner2Name, weddingDate, venue });
-                        notify.success(t('createdWedding', { name: `${partner1Name} & ${partner2Name}` }));
-                        return slug;
-                    } catch (err) {
-                        if (err?.code === 'PLAN_LIMIT_REACHED' || err?.message?.startsWith('PLAN_LIMIT_REACHED')) {
-                            const limit = err.limit || (err.message.split(':')[1]) || 8;
-                            notify.error(t('planLimitReached', { limit }));
-                        } else {
-                            notify.error(err?.message || t('failedSaveWedding'));
+            {/* Create wedding (planners only) */}
+            {!isClient && (
+                <CreateWeddingForm
+                    onCreate={async ({ partner1Name, partner2Name, weddingDate, venue }) => {
+                        try {
+                            const slug = await addWedding({ partner1Name, partner2Name, weddingDate, venue });
+                            notify.success(t('createdWedding', { name: `${partner1Name} & ${partner2Name}` }));
+                            return slug;
+                        } catch (err) {
+                            if (err?.code === 'PLAN_LIMIT_REACHED' || err?.message?.startsWith('PLAN_LIMIT_REACHED')) {
+                                const limit = err.limit || (err.message.split(':')[1]) || 8;
+                                notify.error(t('planLimitReached', { limit }));
+                            } else {
+                                notify.error(err?.message || t('failedSaveWedding'));
+                            }
+                            throw err; // preserve form's submitting state logic
                         }
-                        throw err; // preserve form's submitting state logic
-                    }
-                }}
-                disabled={loading || saving}
-                onError={() => notify.error(t('failedSaveWedding'))}
-            />
+                    }}
+                    disabled={loading || saving}
+                    onError={() => notify.error(t('failedSaveWedding'))}
+                />
+            )}
 
             {/* Weddings list */}
             <WeddingList
-                items={items}
+                items={displayItems}
                 disabled={anyBusy}
                 deletingName={deletingName}
                 onOpen={handleRedirect}
-                onDelete={handleDeleteRequest}
+                onDelete={isClient ? undefined : handleDeleteRequest}
             />
 
             <ConfirmDeleteDialog
