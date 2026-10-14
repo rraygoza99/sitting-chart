@@ -43,7 +43,8 @@ A modern, full-featured wedding and event seating arrangement management applica
 
 ### 👤 User Account & Subscriptions
 - **User Profile Menu:** Quick-access dropdown on both dashboard and seating canvas showing user details, settings shortcut, and logout.
-- **Account & Subscription Management:** Dedicated `/account` view detailing user credentials, active plan status, and subscription tier comparison tailored for event planners (Básico, Profesional, and Agencia / Ilimitado).
+- **Account & Subscription Management:** Dedicated `/account` view displaying user credentials, active subscription plan, planner branding settings, and a "Change Plan" navigation button.
+- **Subscription Plans Page:** Dedicated `/plans` view presenting detailed pricing tier comparison (Básico, Profesional, and Agencia / Ilimitado) and plan switching.
 
 ### 🕒 Automatic Backups & Recovery
 - **Weekly Rolling Backups:** Automatically creates snapshot backups (`_backup_<timestamp>`) when arrangements are saved and at least 7 days have passed since the previous backup.
@@ -84,7 +85,8 @@ sitting-chart/
 │   ├── components/             # React UI components
 │   │   ├── buttonAddWedding/   # Wedding list, create forms, and dialogs
 │   │   ├── common/             # Global providers & UserMenu
-│   │   ├── AccountPage         # Account info & subscription tiers view
+│   │   ├── AccountPage         # Account info, active plan & branding settings
+│   │   ├── PlansPage           # Pricing tiers & subscription plan selection
 │   │   ├── ConfigurationModal  # Settings, CSV import/export & backup restore modal
 │   │   ├── ContextMenu         # Contextual table/guest actions
 │   │   ├── CSVImporter         # CSV parser and sample generator

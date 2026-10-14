@@ -5,6 +5,7 @@ import SeatingCanvas from './components/SeatingCanvas';
 import Login from './components/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import AccountPage from './components/AccountPage';
+import PlansPage from './components/PlansPage';
 import HelpPage from './components/HelpPage';
 import { NotificationProvider } from './components/common/NotificationProvider';
 
@@ -26,6 +27,22 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute requirePlanner={true}>
         <AccountPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/plans',
+    element: (
+      <ProtectedRoute requirePlanner={true}>
+        <PlansPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/account/plans',
+    element: (
+      <ProtectedRoute requirePlanner={true}>
+        <PlansPage />
       </ProtectedRoute>
     ),
   },
